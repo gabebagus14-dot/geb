@@ -5,20 +5,80 @@
 clc; clear; close all;
 
 %% ========================================================================
-%                     1. READ LAS FILE
+%               1. READ LAS FILE (DYNAMIC & UNIVERSAL READER)
 % =========================================================================
-filename = 'WCL0003714.LAS';   
+% A. Pilih File secara Interaktif (Pop-up GUI)
+[file, path] = uigetfile('*.las', 'Pilih File Data LAS');
+if isequal(file,0), error('ANALISIS BERHENTI: Tidak ada file yang dipilih.'); end
+filename = fullfile(path, file);
+fprintf('\n=> Membaca file: %s\n', file);
+
+% B. Membaca Header untuk Mencari Urutan Kolom (Curve Information ~C)
 fid = fopen(filename,'r');
-if fid < 0, error('LAS file not found'); end
-line = ''; while ischar(line), line = fgetl(fid); if contains(upper(line),'~A'), break; end; end
-ascii_data = []; while true, line = fgetl(fid); if ~ischar(line), 
-        break; end, nums = str2num(line); if ~isempty(nums), ascii_data = [ascii_data; nums]; end; end
+curve_names = {};
+in_curve = false;
+
+while ~feof(fid)
+    line = strtrim(fgetl(fid));
+    if startsWith(upper(line), '~C')
+        in_curve = true; continue;
+    elseif startsWith(upper(line), '~') && in_curve
+        in_curve = false;
+    end
+    if startsWith(upper(line), '~A')
+        break; % Berhenti membaca header, masuk ke data angka
+    end
+    
+    % Mengekstrak singkatan nama log (Mnemonic)
+    if in_curve && ~isempty(line) && ~startsWith(line, '#')
+        tokens = regexp(line, '^([^.\s]+)', 'tokens');
+        if ~isempty(tokens)
+            curve_names{end+1} = upper(tokens{1}{1});
+        end
+    end
+end
+
+% C. Membaca Data Angka (ASCII ~A)
+ascii_data = [];
+while true
+    line = fgetl(fid);
+    if ~ischar(line), break; end
+    nums = str2num(line);
+    if ~isempty(nums), ascii_data = [ascii_data; nums]; end
+end
 fclose(fid);
 
-NULL = -999.25; ascii_data(ascii_data == NULL) = NaN;
-DEPT = ascii_data(:,1); GR   = ascii_data(:,2); LLD  = ascii_data(:,4); LLS  = ascii_data(:,5);
-DT   = ascii_data(:,7); RHOB = ascii_data(:,8); NPHI = ascii_data(:,9);
+% D. Membersihkan Data NULL (-999.25 atau sejenisnya)
+NULL = -999.25; ascii_data(ascii_data <= NULL) = NaN;
+
+% E. Identifikasi Kolom Otomatis (Dynamic Column Mapping)
+get_col = @(aliases) find(ismember(curve_names, aliases), 1);
+
+% Mencari kolom Depth
+idx_dept = get_col({'DEPT', 'DEPTH', 'DEP'});
+if isempty(idx_dept), error('ANALISIS BERHENTI: Kolom Depth tidak ditemukan!'); end
+DEPT = ascii_data(:, idx_dept);
+
+% Mendefinisikan kolom dengan alias umum dari berbagai perusahaan (Schlumberger, Halliburton, dll)
+idx_gr   = get_col({'GR', 'GAMMA', 'CGR', 'SGR'});
+idx_lld  = get_col({'LLD', 'RT', 'ILD', 'RD', 'AHT90', 'RDEP'});
+idx_lls  = get_col({'LLS', 'RXO', 'ILM', 'RS', 'AHT10', 'RMIC'});
+idx_rhob = get_col({'RHOB', 'ZDEN', 'DEN', 'RHOZ', 'DENB'});
+idx_nphi = get_col({'NPHI', 'CNC', 'PHIN', 'NPOR', 'HNPO'});
+idx_dt   = get_col({'DT', 'AC', 'DTC', 'DTCO', 'ACCO'});
+
+% F. Ekstraksi Data (Otomatis mengisi NaN jika log tidak tersedia di file tersebut)
+n_rows = length(DEPT);
+if ~isempty(idx_gr),   GR = ascii_data(:, idx_gr);     else, GR = NaN(n_rows, 1);   fprintf('   [!] Peringatan: Log GR tidak ditemukan.\n'); end
+if ~isempty(idx_lld),  LLD = ascii_data(:, idx_lld);   else, LLD = NaN(n_rows, 1);  fprintf('   [!] Peringatan: Log Resistivitas Dalam (RT) tidak ditemukan.\n'); end
+if ~isempty(idx_lls),  LLS = ascii_data(:, idx_lls);   else, LLS = NaN(n_rows, 1);  fprintf('   [!] Peringatan: Log Resistivitas Dangkal (RXO) tidak ditemukan.\n'); end
+if ~isempty(idx_rhob), RHOB = ascii_data(:, idx_rhob); else, RHOB = NaN(n_rows, 1); fprintf('   [!] Peringatan: Log Densitas (RHOB) tidak ditemukan.\n'); end
+if ~isempty(idx_nphi), NPHI = ascii_data(:, idx_nphi); else, NPHI = NaN(n_rows, 1); fprintf('   [!] Peringatan: Log Neutron (NPHI) tidak ditemukan.\n'); end
+if ~isempty(idx_dt),   DT = ascii_data(:, idx_dt);     else, DT = NaN(n_rows, 1);   fprintf('   [!] Peringatan: Log Sonic (DT) tidak ditemukan.\n'); end
+
+% G. Kalkulasi Step Kedalaman Dinamis
 dz = median(diff(DEPT), 'omitnan'); if isnan(dz) || dz == 0, dz = 0.5; end
+fprintf('=> Selesai! Data berhasil diekstrak. Resolusi kedalaman (dz) = %g ft\n', dz);
 
 %% ========================================================================
 %                        FORMATION BOUNDARY  
@@ -31,6 +91,10 @@ zone = flag_reservoir & ~isnan(GR) & ~isnan(LLD) & ~isnan(RHOB) & ~isnan(NPHI);
 %% ======================================================================== 
 %                  PERHITUNGAN PETROFISIK (VSH & PHI) - EVALUASI MURNI
 % =========================================================================
+
+% -------------------------------------------------------------------------
+% BAGIAN 1: PENCARIAN BASELINE & VSHALE (TETAP DIPERTAHANKAN)
+% -------------------------------------------------------------------------
 GR_valid_all = GR(~isnan(GR));
 if ~isempty(GR_valid_all)
     GR_shale_cutoff = prctile(GR_valid_all, 95);
@@ -40,6 +104,7 @@ if ~isempty(GR_valid_all)
         idx_true_shale = (NPHI >= NPHI_shale_cutoff) & ~isnan(RHOB) & ~isnan(LLD);
     end
 end
+
 rho_sh  = median(RHOB(idx_true_shale), 'omitnan');
 phi_Nsh = median(NPHI(idx_true_shale), 'omitnan');
 Rsh     = median(LLD(idx_true_shale), 'omitnan');
@@ -50,37 +115,43 @@ if isnan(Rsh), Rsh = median(LLD(~isnan(LLD)), 'omitnan'); end
 
 fprintf('=> Rho_sh = %.4f g/cc, NPHI_sh = %.4f v/v, Rsh = %.4f ohm.m\n', rho_sh, phi_Nsh, Rsh);
 
-% 1. Perhitungan Vshale (Linier MURNI TANPA BATAS)
+% Perhitungan Vshale (Linier MURNI TANPA BATAS)
 GR_valid = GR(~isnan(GR) & GR > 0);
 GR_clean = prctile(GR_valid, 5); 
 GR_shale = prctile(GR_valid, 95); 
-
 fprintf('=> GR Clean: %.2f API | GR Shale: %.2f API\n', GR_clean, GR_shale);
 
 Vsh = (GR - GR_clean) ./ (GR_shale - GR_clean); 
 % Keterangan: Batas bawah 0 dan batas atas 1 telah DIHAPUS.
 
-% 2. Perhitungan Porositas Efektif (MURNI TANPA BATAS)
-rho_ma = 2.71; rho_f = 1.0;   
-phi_D = (rho_ma - RHOB)./(rho_ma - rho_f); 
-phi_Dsh = (rho_ma - rho_sh)./(rho_ma - rho_f);
+% -------------------------------------------------------------------------
+% BAGIAN 2: PERHITUNGAN POROSITAS EFEKTIF (SESUAI LAPORAN & EXCEL)
+% -------------------------------------------------------------------------
+rho_ma = 2.71; % Matriks Karbonat (Limestone)
+rho_f = 1.0;   % Fluida Fresh Water
 
-% --- KODE UNTUK CETAK KE COMMAND WINDOW ---
+% Menghitung Porositas Log Murni (Sebelum Koreksi)
+phi_D = (rho_ma - RHOB) ./ (rho_ma - rho_f); 
+
+% Menghitung Baseline Porositas Density Shale (phi_Dsh)
+phi_Dsh = (rho_ma - rho_sh) ./ (rho_ma - rho_f);
+
+% --- KODE UNTUK MENCETAK ACUAN EXCEL KE COMMAND WINDOW ---
 fprintf('\n========================================================\n');
-fprintf('     PARAMETER SHALE BASELINE (UNTUK INPUT EXCEL)\n');
+fprintf('   ACUAN HITUNGAN MANUAL EXCEL (POROSITAS & SHALE)\n');
 fprintf('========================================================\n');
-fprintf(' 1. Bulk Density Shale (rho_sh)      : %.4f g/cc\n', rho_sh);
-fprintf(' 2. Porositas Density Shale (phi_Dsh): %.4f v/v\n', phi_Dsh);
-fprintf(' 3. Porositas Neutron Shale (phi_Nsh): %.4f v/v\n', phi_Nsh);
+fprintf(' Gunakan nilai ini sebagai konstanta di Excel Anda:\n');
+fprintf(' - Densitas Shale (pb_sh / rho_sh)   : %.4f g/cc\n', rho_sh);
+fprintf(' - Porositas Neutron Shale (Por_Nsh) : %.4f v/v\n', phi_Nsh);
+fprintf(' - Porositas Density Shale (phi_Dsh) : %.4f v/v\n', phi_Dsh);
 fprintf('========================================================\n\n');
 
-% Lanjutan Perhitungan
+% Mengaplikasikan Koreksi Volume Shale (Sesuai rumus laporan Anda)
 phi_Dc = phi_D - (Vsh .* phi_Dsh); 
 phi_Nc = NPHI - (Vsh .* phi_Nsh); 
 
-% Menggunakan perhitungan RMS Murni
-phi_eff = sqrt((phi_Nc.^2 + phi_Dc.^2) ./ 2);
-% Keterangan: Batas bawah 0.001 dan batas atas 0.40 telah DIHAPUS.
+% Menghitung Porositas Efektif Total (Arithmetic Mean)
+phi_eff = (phi_Nc + phi_Dc) ./ 2;
 
 %% ========================================================================
 %               WATER SATURATION & PICKETT PLOT - EVALUASI MURNI
@@ -218,7 +289,7 @@ set(gca, 'FontSize', 10, 'GridLineStyle', ':', 'GridAlpha', 0.6);
 % =========================================================================
 % Membuat filter untuk MENGECUALIKAN zona data rusak (6700 - 6800 ft)
 % CATATAN: Pastikan rentang ini sama persis dengan yang Anda hapus di Excel!
-valid_log = ~(DEPT >= 6700 & DEPT <= 6800); 
+valid_log = ~(DEPT >= 6600 & DEPT <= 6800); 
 
 % Perhitungan ketebalan & rata-rata keseluruhan formasi (Hanya Data Valid)
 idx_form = find(DEPT >= Top_Formasi & DEPT <= Base_Formasi & valid_log); 
@@ -616,7 +687,7 @@ fprintf('=======================================================================
 % =========================================================================
 % 9.1 Definisi Logika Flags & Lithology (Diperbarui)
 % KOREKSI: Mengecualikan data rusak sesuai QC data LAS terbaru
-valid_log = ~(DEPT >= 6700 & DEPT <= 6800); 
+valid_log = ~(DEPT >= 6600 & DEPT <= 6800);
 
 LithCode = NaN(size(DEPT));
 LithCode(Vsh > CO_Vsh) = 1;                                      
@@ -922,7 +993,8 @@ Tabel_Petrofisika = table(Depth_ft, GR_api, Res_Deep, Rho_bulk, Nphi_v, Dt_usft,
                           Vshale_v, Porosity_Eff, Water_Sat, ...
                           Lith_Code, Net_Res_Flag, Net_Pay_Flag, Valid_Data);
 
-% 3. Menyimpan Tabel ke File Excel (.xlsx)
+% 3. Menyimpan Tabel ke File Excel
+% (.xlsx)
 nama_file_excel = 'Hasil_Petrofisika_Formasi_Kujung.xlsx';
 writetable(Tabel_Petrofisika, nama_file_excel, 'Sheet', 'Data_Per_Depth');
 
