@@ -80,6 +80,11 @@ if ~isempty(idx_dt),   DT = ascii_data(:, idx_dt);     else, DT = NaN(n_rows, 1)
 dz = median(diff(DEPT), 'omitnan'); if isnan(dz) || dz == 0, dz = 0.5; end
 fprintf('=> Selesai! Data berhasil diekstrak. Resolusi kedalaman (dz) = %g ft\n', dz);
 
+% NILAI CUT-OFF MANUAL (SESUAI GAMBAR JURNAL)
+CO_Phi = 0.065; 
+CO_Vsh = 0.37;  
+CO_Sw  = 0.55;
+
 %% ========================================================================
 %                        FORMATION BOUNDARY  
 % =========================================================================
@@ -176,114 +181,141 @@ fprintf('=> Nilai Rw terhitung murni dari zona air: %.6f ohm.m\n', Rw);
 Sw = ( (a .* Rw) ./ ((phi_eff.^m) .* LLD) ) .^ (1/n);
 % Keterangan: Batas Sw < 0.05 dan Sw > 1.0 telah DIHAPUS.
 
-% --- (Sisa kode pembuatan Figure Pickett Plot di bawah ini tetap sama seperti milik Anda) ---
-figure('Name', 'Pickett Plot - Final Validation', 'Color', 'w', 'Position', [200 200 800 700]);
-h_all = loglog(LLD(zone), phi_eff(zone), 'o', 'MarkerSize', 3, 'MarkerFaceColor', [0.8 0.8 0.8], 'MarkerEdgeColor', 'none'); 
+% --- KODE PEMBUATAN FIGURE PICKETT PLOT (REVISI JURNAL) ---
+fig_pickett = figure('Name', 'Pickett Plot - Final Validation', 'Color', 'w', 'Position', [200 200 900 800]);
+h_all = loglog(LLD(zone), phi_eff(zone), 'o', 'MarkerSize', 4, 'MarkerFaceColor', [0.8 0.8 0.8], 'MarkerEdgeColor', 'none'); 
 hold on; grid on;
+
 phi_line_range = logspace(log10(0.01), log10(1.0), 100); 
 sw_lines = [1.0, 0.5, 0.25]; 
 colors = {'b', 'g', 'r'};   
+
 for i = 1:length(sw_lines)
     sw_val = sw_lines(i);
     rt_calc = (a * Rw) ./ ((phi_line_range.^m) .* (sw_val^n));
-    plot(rt_calc, phi_line_range, 'Color', colors{i}, 'LineWidth', 2);
+    plot(rt_calc, phi_line_range, 'Color', colors{i}, 'LineWidth', 2.5); % Garis dipertebal
     
     text_phi = 0.05; 
     text_rt = (a * Rw) / (text_phi^m * sw_val^n);
     if text_rt < 2000 
+        % Font persentase Sw dinaikkan dari 9 ke 13
         text(text_rt, text_phi, [' Sw ' num2str(sw_val*100) '%'], ...
-             'Color', colors{i}, 'FontWeight', 'bold', 'FontSize', 9, 'BackgroundColor', 'w');
+             'Color', colors{i}, 'FontWeight', 'bold', 'FontSize', 13, 'BackgroundColor', 'w');
     end
 end
+
 if sum(idx_water) > 0
-    h_water = loglog(LLD(idx_water), phi_eff(idx_water), 'bo', 'MarkerSize', 6, 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'k'); 
+    h_water = loglog(LLD(idx_water), phi_eff(idx_water), 'bo', 'MarkerSize', 8, 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'k'); 
 end
-plot(Rw, 1, 'rp', 'MarkerSize', 14, 'MarkerFaceColor', 'y', 'MarkerEdgeColor', 'r'); 
-title(['Pickett Plot | Rw = ' num2str(Rw, '%.3f') ' ohm.m'], 'FontSize', 12);
-xlabel('Deep Resistivity, R_t (ohm.m)', 'FontWeight', 'bold');
-ylabel('Effective Porosity, \phi_e (v/v)', 'FontWeight', 'bold');
-set(gca, 'XLim', [0.1 2000], 'YLim', [0.01 1.0], 'FontSize', 10);
+plot(Rw, 1, 'rp', 'MarkerSize', 16, 'MarkerFaceColor', 'y', 'MarkerEdgeColor', 'r'); 
+
+% Rw tidak dibulatkan (menggunakan 6 desimal) dan font judul diperbesar menjadi 16
+title(['Pickett Plot | Rw = ' num2str(Rw, '%.6f') ' ohm.m'], 'FontSize', 16, 'FontWeight', 'bold');
+
+% Label X dan Y diperbesar menjadi 15
+xlabel('Deep Resistivity, R_t (ohm.m)', 'FontWeight', 'bold', 'FontSize', 15);
+ylabel('Effective Porosity, \phi_e (v/v)', 'FontWeight', 'bold', 'FontSize', 15);
+
+% Angka skala (tick marks) diperbesar menjadi 13
+set(gca, 'XLim', [0.1 2000], 'YLim', [0.01 1.0], 'FontSize', 13);
 grid on; set(gca, 'GridLineStyle', ':', 'GridAlpha', 0.6);
+
 if sum(idx_water) > 0
-    legend([h_all, h_water], {'All Data', 'Water Zone (Verified)'}, 'Location', 'southwest');
+    % Font legend diperbesar menjadi 12
+    legend([h_all, h_water], {'All Data', 'Water Zone (Verified)'}, 'Location', 'southwest', 'FontSize', 12);
 else
-    legend(h_all, {'All Data'}, 'Location', 'southwest');
+    legend(h_all, {'All Data'}, 'Location', 'southwest', 'FontSize', 12);
 end
 hold off;
 
-%% ========================================================================
-%                      CUTOFF - EVALUASI MURNI
 % =========================================================================
-vsh_form = Vsh(zone); phi_form = phi_eff(zone); sw_form = Sw(zone);
+% EXPORT PICKETT PLOT KE RESOLUSI TINGGI
+% =========================================================================
+exportgraphics(fig_pickett, 'Pickett_Plot_600DPI.png', 'Resolution', 600);
+fprintf('=> Sukses! Gambar Pickett Plot (High-Res 600 DPI) telah disimpan.\n');
+%% ========================================================================
+%       VISUALISASI CUT-OFF (RESOLUSI TINGGI UNTUK JURNAL)
+% =========================================================================
+% Definisikan variabel data formasi terlebih dahulu
+vsh_form = Vsh(zone); 
+phi_form = phi_eff(zone); 
+sw_form  = Sw(zone);
 
-% 1. Cut-off Porositas (MURNI STATISTIK)
-batas_clean_dinamis = prctile(vsh_form, 25); 
-idx_clean = (vsh_form <= batas_clean_dinamis); 
+% --- PENGATURAN FONT GLOBAL UNTUK CUT-OFF ---
+Title_FS = 20;   % Ukuran Font Judul
+Label_FS = 16;   % Ukuran Font Sumbu (X dan Y Label)
+Tick_FS  = 14;   % Ukuran Font Angka Skala
+Text_FS  = 15;   % Ukuran Font Teks Keterangan
 
-if sum(idx_clean) > 50
-    CO_Phi = prctile(phi_form(idx_clean), 5); 
-else
-    CO_Phi = prctile(phi_form, 10);
-end
-% (Clamp CO_Phi < 0.04 telah DIHAPUS)
+% Perbesar ukuran figure agar 3 subplot tidak berdesakan
+fig_cutoff = figure('Name', 'Analisis Cut-Off Statistik', 'Color', 'w', 'Position', [50 100 1600 550], 'NumberTitle', 'off');
 
-% 2. Cut-off Vshale (MURNI STATISTIK)
-idx_good_phi = (phi_form >= CO_Phi);
-mean_vsh = mean(vsh_form(idx_good_phi), 'omitnan');
-std_vsh  = std(vsh_form(idx_good_phi), 'omitnan');
-CO_Vsh   = mean_vsh + (2 * std_vsh);
-% (Clamp CO_Vsh > 1.0 telah DIHAPUS)
-
-% 3. Cut-off Sw (MURNI STATISTIK)
-% Menggunakan seluruh zona porositas bagus TANPA asumsi batas Sw < 0.80
-idx_hc_cluster = idx_good_phi; 
-mean_sw = mean(sw_form(idx_hc_cluster), 'omitnan');
-std_sw  = std(sw_form(idx_hc_cluster), 'omitnan');
-CO_Sw   = mean_sw + (3 * std_sw);
-% (Clamp CO_Sw > 1.0 telah DIHAPUS)
-
-% Cetak hasil dengan 5 angka desimal agar mudah dicocokkan dengan Excel
-fprintf('\n=> PENENTUAN CUT-OFF (NILAI MURNI MATEMATIS) :\n');
-fprintf('   - Cut-off Porositas      : %.5f (%.2f %%)\n', CO_Phi, CO_Phi*100);
-fprintf('   - Cut-off Vshale         : %.5f (%.2f %%)\n', CO_Vsh, CO_Vsh*100);
-fprintf('   - Cut-off Sw             : %.5f (%.2f %%)\n', CO_Sw, CO_Sw*100);
-
-%% VISUALISASI MURNI (AutoScale Sumbu)
-figure('Name', 'Analisis Cut-Off Statistik - Raw Data', 'Color', 'w', 'Position', [50 100 1300 450]);
-
-% Histogram Porositas
+% ---------------------------------------------------------
+% Subplot 1: Histogram Porositas
+% ---------------------------------------------------------
 subplot(1,3,1);
-histogram(phi_form(idx_clean), 30, 'FaceColor', [0.2 0.6 0.8], 'EdgeColor', 'k'); hold on; grid on;
-xline(CO_Phi, 'r-', 'LineWidth', 2.5);
-title('Histogram PHIE (Zona Clean)', 'FontWeight', 'bold');
-xlabel('Effective Porosity (PHIE)', 'FontWeight', 'bold'); ylabel('Frekuensi', 'FontWeight', 'bold');
-text(CO_Phi, max(ylim)*0.9, sprintf(' CO_PHIE = %.3f', CO_Phi), 'Color', 'r', 'FontWeight', 'bold');
-axis tight; % Biarkan MATLAB menyesuaikan batas sumbu otomatis
+histogram(phi_form(vsh_form <= CO_Vsh), 30, 'FaceColor', [0.2 0.6 0.8], 'EdgeColor', 'k', 'LineWidth', 1.2); hold on; grid on;
+xline(CO_Phi, 'r-', 'LineWidth', 3.5);
+title('Histogram PHIE', 'FontWeight', 'bold', 'FontSize', Title_FS);
+xlabel('Effective Porosity (PHIE)', 'FontWeight', 'bold', 'FontSize', Label_FS); 
+ylabel('Frekuensi', 'FontWeight', 'bold', 'FontSize', Label_FS);
 
-% Crossplot VSH vs PHIE
+% KUNCI: Kunci sumbu X dan Y DULU sebelum meletakkan teks!
+xlim([0 max(0.4, max(phi_form)+0.05)]);
+
+% Teks diletakkan tepat di tengah secara vertikal (0.5) agar aman dari judul
+text(CO_Phi + 0.015, max(ylim)*0.50, sprintf('PHIE \\geq %.3f', CO_Phi), 'Color', 'r', 'FontWeight', 'bold', 'FontSize', Text_FS, 'BackgroundColor', 'w', 'Margin', 2);
+set(gca, 'FontSize', Tick_FS, 'LineWidth', 1.5, 'FontWeight', 'bold', 'GridLineStyle', ':', 'GridAlpha', 0.6);
+
+% ---------------------------------------------------------
+% Subplot 2: Crossplot VSH vs PHIE
+% ---------------------------------------------------------
 subplot(1,3,2);
-scatter(vsh_form, phi_form, 15, DEPT(zone), 'filled', 'MarkerFaceAlpha', 0.7); 
+scatter(vsh_form, phi_form, 45, DEPT(zone), 'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 0.5, 'MarkerFaceAlpha', 0.8); 
 colormap(jet); hold on; grid on;
-xline(CO_Vsh, 'r-', 'LineWidth', 2.5); yline(CO_Phi, 'r-', 'LineWidth', 2.5);
-title('Crossplot VSH vs PHIE', 'FontWeight', 'bold');
-xlabel('Volume Shale (VSH)', 'FontWeight', 'bold'); ylabel('Effective Porosity (PHIE)', 'FontWeight', 'bold');
-text(CO_Vsh, max(ylim)*0.8, sprintf(' VSH \\leq %.2f', CO_Vsh), 'FontWeight', 'bold', 'FontSize', 10, 'Color', 'k');
-text(min(xlim), CO_Phi, sprintf(' PHIE \\geq %.3f', CO_Phi), 'FontWeight', 'bold', 'FontSize', 10, 'Color', 'k');
-axis tight; 
-set(gca, 'FontSize', 10, 'GridLineStyle', ':', 'GridAlpha', 0.6);
+xline(CO_Vsh, 'r-', 'LineWidth', 3.5); 
+yline(CO_Phi, 'r-', 'LineWidth', 3.5);
+title('Crossplot VSH vs PHIE', 'FontWeight', 'bold', 'FontSize', Title_FS);
+xlabel('Volume Shale (VSH)', 'FontWeight', 'bold', 'FontSize', Label_FS); 
+ylabel('Effective Porosity (PHIE)', 'FontWeight', 'bold', 'FontSize', Label_FS);
 
-% Crossplot PHIE vs SW
+% KUNCI: Kunci sumbu X dan Y DULU sebelum meletakkan teks!
+xlim([0 1.0]); 
+ylim([0 max(0.4, max(phi_form)+0.05)]);
+
+% Teks diparkir jauh dari judul dan keramaian titik
+text(CO_Vsh + 0.03, max(ylim)*0.50, sprintf('VSH \\leq %.2f', CO_Vsh), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'r', 'BackgroundColor', 'w', 'Margin', 2);
+text(max(xlim)*0.70, CO_Phi + 0.02, sprintf('PHIE \\geq %.3f', CO_Phi), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'r', 'BackgroundColor', 'w', 'Margin', 2, 'HorizontalAlignment', 'center');
+
+set(gca, 'FontSize', Tick_FS, 'LineWidth', 1.5, 'FontWeight', 'bold', 'GridLineStyle', ':', 'GridAlpha', 0.6);
+
+% ---------------------------------------------------------
+% Subplot 3: Crossplot PHIE vs SW
+% ---------------------------------------------------------
 subplot(1,3,3);
-scatter(phi_form, sw_form, 15, DEPT(zone), 'filled', 'MarkerFaceAlpha', 0.7); 
+scatter(phi_form, sw_form, 45, DEPT(zone), 'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 0.5, 'MarkerFaceAlpha', 0.8); 
 hold on; grid on;
-xline(CO_Phi, 'r-', 'LineWidth', 2.5); yline(CO_Sw, 'r-', 'LineWidth', 2.5);
-title('Crossplot PHIE vs SW', 'FontWeight', 'bold');
-xlabel('Effective Porosity (PHIE)', 'FontWeight', 'bold'); ylabel('Water Saturation (SW)', 'FontWeight', 'bold');
-text(CO_Phi, max(ylim)*0.1, sprintf(' PHIE \\geq %.3f', CO_Phi), 'FontWeight', 'bold', 'FontSize', 10, 'Color', 'k');
-text(min(xlim), CO_Sw, sprintf(' SW \\leq %.2f', CO_Sw), 'FontWeight', 'bold', 'FontSize', 10, 'Color', 'k');
-axis tight;
-set(gca, 'FontSize', 10, 'GridLineStyle', ':', 'GridAlpha', 0.6);
+xline(CO_Phi, 'r-', 'LineWidth', 3.5); 
+yline(CO_Sw, 'r-', 'LineWidth', 3.5); 
+title('Crossplot PHIE vs SW', 'FontWeight', 'bold', 'FontSize', Title_FS);
+xlabel('Effective Porosity (PHIE)', 'FontWeight', 'bold', 'FontSize', Label_FS); 
+ylabel('Water Saturation (SW)', 'FontWeight', 'bold', 'FontSize', Label_FS);
 
+% KUNCI: Kunci sumbu X dan Y DULU sebelum meletakkan teks!
+xlim([0 max(0.4, max(phi_form)+0.05)]); 
+ylim([0 1.0]);
+
+% Teks diparkir di tempat kosong
+text(CO_Phi + 0.02, 0.85, sprintf('PHIE \\geq %.3f', CO_Phi), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'r', 'BackgroundColor', 'w', 'Margin', 2);
+text(max(xlim)*0.70, CO_Sw + 0.04, sprintf('SW \\leq %.2f', CO_Sw), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'r', 'BackgroundColor', 'w', 'Margin', 2, 'HorizontalAlignment', 'center');
+
+set(gca, 'FontSize', Tick_FS, 'LineWidth', 1.5, 'FontWeight', 'bold', 'GridLineStyle', ':', 'GridAlpha', 0.6);
+
+% =========================================================================
+% EXPORT GAMBAR CUT-OFF KE RESOLUSI TINGGI
+% =========================================================================
+exportgraphics(fig_cutoff, 'Analisis_Cutoff_Manual_600DPI.png', 'Resolution', 600);
+fprintf('=> Sukses! Gambar Analisis Cut-Off (Manual 600 DPI) telah disimpan.\n');
 %% ========================================================================
 %                               PAY SUMMARY
 % =========================================================================
@@ -412,195 +444,260 @@ fprintf('-----------------------------------------------------------------------
 fprintf('===================================================================================================\n\n');
 
 %% ========================================================================
-%                   LITHOLOGY & FLUID VALIDATION CROSSPLOTS
+%             LITHOLOGY & FLUID VALIDATION CROSSPLOTS (JURNAL SINTA)
 % =========================================================================
-% Update: 3 Warna untuk 3 Zona Utama
+% Definisi Zona Kualitatif
+Zona_Kualitatif = [
+    5500, 6000;
+    6000, 7000;
+    7000, 7200
+];
 ZoneColors = [
     1.0 0.0 0.0; % Z1 (Merah)
     0.0 0.0 1.0; % Z2 (Biru)
     0.0 0.8 0.0; % Z3 (Hijau)
 ];
-
-% Memastikan titik data 6600-6800 ft TIDAK TAMPIL di Crossplot (Background)
 idx_formasi = (DEPT >= Top_Formasi & DEPT <= Base_Formasi & valid_log);
 
-% [LANJUTKAN KE KODE PLOTTING DENSITY-NEUTRON ANDA SEPERTI BIASA DI BAWAH INI...]
+% --- PENGATURAN FONT GLOBAL UNTUK JURNAL ---
+Title_FS = 22;   % Ukuran Font Judul Gambar
+Label_FS = 18;   % Ukuran Font Sumbu (X dan Y Label)
+Tick_FS  = 14;   % Ukuran Font Angka Skala (Tick Marks)
+Text_FS  = 14;   % Ukuran Font Teks di dalam plot (Nama Matriks)
 
 % -------------------------------------------------------------------------
 % 8.1 DENSITY-NEUTRON CROSSPLOT
 % -------------------------------------------------------------------------
-figure('Name','Density-Neutron Crossplot','Color','w','Position',[100 50 900 850]);
+fig_dn = figure('Name','Density-Neutron Crossplot','Color','w','Position',[100 50 1000 950]);
 hold on; box on; xlim([-0.05 0.45]); ylim([1.9 3.0]);
-set(gca, 'XDir', 'normal', 'YDir', 'reverse', 'FontSize', 10); 
+
+% UPGRADE JURNAL: Font angka skala diperbesar
+set(gca, 'XDir', 'normal', 'YDir', 'reverse', 'FontSize', Tick_FS, 'LineWidth', 2.0, 'FontWeight', 'bold'); 
 grid on; set(gca, 'GridLineStyle', ':', 'GridColor', [0.5 0.5 0.5], 'GridAlpha', 0.6);
-xlabel('Neutron Porosity (v/v) - Limestone Matrix', 'FontWeight','bold', 'FontSize',12);
-ylabel('Bulk Density, \rho_b (g/cc)', 'FontWeight','bold', 'FontSize',12);
-title({'Density-Neutron Crossplot'}, 'FontWeight','bold', 'FontSize',14);
+
+% UPGRADE JURNAL: Label diperbesar ke 18, Title ke 22
+xlabel('Neutron Porosity (v/v) - Limestone Matrix', 'FontWeight','bold', 'FontSize',Label_FS);
+ylabel('Bulk Density, \rho_b (g/cc)', 'FontWeight','bold', 'FontSize',Label_FS);
+title({'Density-Neutron Crossplot'}, 'FontWeight','bold', 'FontSize',Title_FS);
+
 phi_ref = 0:0.01:0.50; 
 pts_n_ss=[-0.015,0.04,0.10,0.16,0.22,0.28,0.34]; pts_d_ss=[2.65,2.56,2.46,2.36,2.26,2.16,2.06]; 
 n_line_ss=interp1(pts_n_ss,pts_n_ss,phi_ref,'linear','extrap'); d_line_ss=interp1(pts_n_ss,pts_d_ss,phi_ref,'pchip','extrap');
 n_line_ls=phi_ref; d_line_ls=(1-phi_ref)*2.71+phi_ref*1.0; 
 pts_n_dl=[0.01,0.07,0.13,0.19,0.25,0.31,0.38]; pts_d_dl=[2.87,2.76,2.65,2.54,2.43,2.32,2.20];
 n_line_dl=interp1(pts_n_dl,pts_n_dl,phi_ref,'linear','extrap'); d_line_dl=interp1(pts_n_dl,pts_d_dl,phi_ref,'pchip','extrap');
-lw=1.5; plot(n_line_ss, d_line_ss, 'k-', 'LineWidth', lw); plot(n_line_ls, d_line_ls, 'k-', 'LineWidth', lw); plot(n_line_dl, d_line_dl, 'k-', 'LineWidth', lw); 
-text(-0.02,2.65,'Quartz','FontWeight','bold','FontSize',10,'Rotation',-25); text(0.00,2.72,'Limestone','FontWeight','bold','FontSize',10,'Rotation',-28); text(0.02,2.88,'Dolomite','FontWeight','bold','FontSize',10,'Rotation',-30);
+
+% Garis dipertebal
+lw=2.5; 
+plot(n_line_ss, d_line_ss, 'k-', 'LineWidth', lw); plot(n_line_ls, d_line_ls, 'k-', 'LineWidth', lw); plot(n_line_dl, d_line_dl, 'k-', 'LineWidth', lw); 
+text(-0.02,2.65,'Quartz','FontWeight','bold','FontSize',Text_FS,'Rotation',-25); 
+text(0.00,2.72,'Limestone','FontWeight','bold','FontSize',Text_FS,'Rotation',-28); 
+text(0.02,2.88,'Dolomite','FontWeight','bold','FontSize',Text_FS,'Rotation',-30);
+
 for t = 0:0.05:0.40
     d_ss_t=(1-t)*2.65+t*1.0; n_ss_t=interp1(d_line_ss,n_line_ss,d_ss_t); 
     d_ls_t=(1-t)*2.71+t*1.0; n_ls_t=t; 
     d_dl_t=(1-t)*2.87+t*1.0; n_dl_t=interp1(d_line_dl,n_line_dl,d_dl_t);
-    plot([n_ss_t n_dl_t],[d_ss_t d_dl_t],'k:','LineWidth',0.8);
-    plot(n_ss_t,d_ss_t,'k_','MarkerSize',6,'LineWidth',2); plot(n_ls_t,d_ls_t,'k_','MarkerSize',6,'LineWidth',2); plot(n_dl_t,d_dl_t,'k_','MarkerSize',6,'LineWidth',2);
-    if t>0, text(n_dl_t+0.01,d_dl_t,num2str(t*100),'FontSize',8,'FontWeight','bold','Color','b'); else, text(n_dl_t+0.01,d_dl_t,'0','FontSize',8,'FontWeight','bold','Color','b'); end
+    plot([n_ss_t n_dl_t],[d_ss_t d_dl_t],'k:','LineWidth',1.5);
+    plot(n_ss_t,d_ss_t,'k_','MarkerSize',10,'LineWidth',2.5); plot(n_ls_t,d_ls_t,'k_','MarkerSize',10,'LineWidth',2.5); plot(n_dl_t,d_dl_t,'k_','MarkerSize',10,'LineWidth',2.5);
+    if t>0, text(n_dl_t+0.01,d_dl_t,num2str(t*100),'FontSize',12,'FontWeight','bold','Color','b'); else, text(n_dl_t+0.01,d_dl_t,'0','FontSize',12,'FontWeight','bold','Color','b'); end
 end
-idx_bg = idx_formasi & ~isnan(NPHI) & ~isnan(RHOB);
-scatter(NPHI(idx_bg), RHOB(idx_bg), 15, [0.6 0.6 0.6], 'filled', 'MarkerEdgeColor','none', 'MarkerFaceAlpha',0.5);
 
-% Plot 8 Zona & Legend Dinamis
+idx_bg = idx_formasi & ~isnan(NPHI) & ~isnan(RHOB);
+scatter(NPHI(idx_bg), RHOB(idx_bg), 25, [0.6 0.6 0.6], 'filled', 'MarkerEdgeColor','none', 'MarkerFaceAlpha',0.5);
+
 h_zones = zeros(1, size(Zona_Kualitatif, 1)); 
 for i = 1:size(Zona_Kualitatif, 1)
     idx_z = (DEPT >= Zona_Kualitatif(i,1) & DEPT <= Zona_Kualitatif(i,2)) & ~isnan(NPHI) & ~isnan(RHOB);
-    h_zones(i) = scatter(NPHI(idx_z), RHOB(idx_z), 35, ZoneColors(i,:), 'filled', 'MarkerEdgeColor','k', 'LineWidth',0.5, 'MarkerFaceAlpha',0.9);
+    h_zones(i) = scatter(NPHI(idx_z), RHOB(idx_z), 55, ZoneColors(i,:), 'filled', 'MarkerEdgeColor','k', 'LineWidth',1.0, 'MarkerFaceAlpha',0.9);
 end
 legend_names = cell(1, size(Zona_Kualitatif, 1));
 for j = 1:size(Zona_Kualitatif, 1)
     legend_names{j} = sprintf('Z%d (%d-%d)', j, Zona_Kualitatif(j,1), Zona_Kualitatif(j,2));
 end
-legend(h_zones, legend_names, 'Location','southwest', 'FontSize', 8);
+legend(h_zones, legend_names, 'Location','southwest', 'FontSize', Text_FS, 'FontWeight','bold');
+plot(-0.01, 2.98, 'ko', 'MarkerFaceColor','w', 'LineWidth',2.0, 'MarkerSize',10); text(0.01, 2.98, 'Anhydrite', 'FontSize',Text_FS, 'FontWeight','bold');
+plot(1.0, 1.0, 'bo', 'MarkerFaceColor','b', 'MarkerSize',10); text(0.40, 1.95, '\rho_f = 1.0 g/cc', 'FontSize',Text_FS, 'FontWeight','bold', 'Color','b'); hold off;
 
-plot(-0.01, 2.98, 'ko', 'MarkerFaceColor','w', 'LineWidth',1.5); text(0.01, 2.98, 'Anhydrite', 'FontSize',9, 'FontWeight','bold');
-plot(1.0, 1.0, 'bo', 'MarkerFaceColor','b'); text(0.40, 1.95, '\rho_f = 1.0 g/cc', 'FontSize',10, 'Color','b'); hold off;
+exportgraphics(fig_dn, '1_Density_Neutron_Crossplot_600DPI.png', 'Resolution', 600);
 
 % -------------------------------------------------------------------------
 % 8.2 MATRIX IDENTIFICATION PLOT (MID PLOT)
 % -------------------------------------------------------------------------
-figure('Name','MID Plot','Color','w','Position',[50 50 1000 950]); 
-axMain = axes('Position', [0.1 0.1 0.85 0.85]); hold(axMain, 'on'); box(axMain, 'on');
-xlim(axMain, [35 75]); ylim(axMain, [2.4 3.1]); set(axMain, 'YDir', 'reverse', 'FontSize', 10);
+fig_mid = figure('Name','MID Plot','Color','w','Position',[50 50 1100 1000]); 
+axMain = axes('Position', [0.12 0.12 0.82 0.78]); hold(axMain, 'on'); box(axMain, 'on');
+xlim(axMain, [35 75]); ylim(axMain, [2.4 3.1]); 
+set(axMain, 'YDir', 'reverse', 'FontSize', Tick_FS, 'LineWidth', 2.0, 'FontWeight', 'bold');
 set(axMain, 'XTick', 35:5:75, 'YTick', 2.4:0.1:3.1);  
 grid(axMain, 'on'); set(axMain, 'XMinorGrid', 'on', 'YMinorGrid', 'on'); 
 set(axMain, 'GridColor', [0.5 0.5 0.5], 'GridAlpha', 0.6, 'GridLineStyle', ':');
+
 rho_f_mid=1.00; dt_f_mid=189;
 rho_maa = (RHOB - NPHI.*rho_f_mid) ./ (1 - NPHI);
 dt_maa  = (DT - NPHI.*dt_f_mid) ./ (1 - NPHI);
 QZ=[55.5, 2.65]; LS=[47.6, 2.71]; DL=[43.5, 2.87]; AN=[50.0, 2.98];
-plot(axMain, [QZ(1) LS(1) DL(1) QZ(1)], [QZ(2) LS(2) DL(2) QZ(2)], 'k-', 'LineWidth', 1.5);
-ms_main=6; plot(axMain, QZ(1), QZ(2), 'ro', 'MarkerFaceColor','w', 'LineWidth',1.5, 'MarkerSize',ms_main); plot(axMain, LS(1), LS(2), 'ro', 'MarkerFaceColor','w', 'LineWidth',1.5, 'MarkerSize',ms_main); plot(axMain, DL(1), DL(2), 'ro', 'MarkerFaceColor','w', 'LineWidth',1.5, 'MarkerSize',ms_main); plot(axMain, AN(1), AN(2), 'ko', 'MarkerFaceColor','w', 'LineWidth',1.2, 'MarkerSize',ms_main);
-text(axMain, QZ(1)+1, QZ(2), 'Quartz', 'Color','r', 'FontWeight','bold', 'FontSize',10); text(axMain, LS(1)-4, LS(2), 'Calcite', 'Color','r', 'FontWeight','bold', 'FontSize',10); text(axMain, DL(1)-4, DL(2), 'Dolomite', 'Color','r', 'FontWeight','bold', 'FontSize',10); text(axMain, AN(1)+1, AN(2), 'Anhydrite', 'Color','k', 'FontWeight','bold', 'FontSize',9);
-idx_bg_mid = idx_formasi & ~isnan(rho_maa) & ~isnan(dt_maa);
-scatter(axMain, dt_maa(idx_bg_mid), rho_maa(idx_bg_mid), 15, [0.6 0.6 0.6], 'filled', 'MarkerEdgeColor','none', 'MarkerFaceAlpha',0.5);
+plot(axMain, [QZ(1) LS(1) DL(1) QZ(1)], [QZ(2) LS(2) DL(2) QZ(2)], 'k-', 'LineWidth', 2.5);
 
+ms_main=10; 
+plot(axMain, QZ(1), QZ(2), 'ro', 'MarkerFaceColor','w', 'LineWidth',2.0, 'MarkerSize',ms_main); 
+plot(axMain, LS(1), LS(2), 'ro', 'MarkerFaceColor','w', 'LineWidth',2.0, 'MarkerSize',ms_main); 
+plot(axMain, DL(1), DL(2), 'ro', 'MarkerFaceColor','w', 'LineWidth',2.0, 'MarkerSize',ms_main); 
+plot(axMain, AN(1), AN(2), 'ko', 'MarkerFaceColor','w', 'LineWidth',1.5, 'MarkerSize',ms_main);
+
+text(axMain, QZ(1)+1, QZ(2), 'Quartz', 'Color','r', 'FontWeight','bold', 'FontSize',Text_FS); 
+text(axMain, LS(1)-5, LS(2), 'Calcite', 'Color','r', 'FontWeight','bold', 'FontSize',Text_FS); 
+text(axMain, DL(1)-5, DL(2), 'Dolomite', 'Color','r', 'FontWeight','bold', 'FontSize',Text_FS); 
+text(axMain, AN(1)+1, AN(2), 'Anhydrite', 'Color','k', 'FontWeight','bold', 'FontSize',Text_FS);
+
+idx_bg_mid = idx_formasi & ~isnan(rho_maa) & ~isnan(dt_maa);
+scatter(axMain, dt_maa(idx_bg_mid), rho_maa(idx_bg_mid), 25, [0.6 0.6 0.6], 'filled', 'MarkerEdgeColor','none', 'MarkerFaceAlpha',0.5);
 for i = 1:size(Zona_Kualitatif, 1)
     idx_z_mid = (DEPT >= Zona_Kualitatif(i,1) & DEPT <= Zona_Kualitatif(i,2)) & ~isnan(rho_maa) & ~isnan(dt_maa);
-    scatter(axMain, dt_maa(idx_z_mid), rho_maa(idx_z_mid), 35, ZoneColors(i,:), 'filled', 'MarkerEdgeColor','k', 'LineWidth',0.5, 'MarkerFaceAlpha',0.9);
+    scatter(axMain, dt_maa(idx_z_mid), rho_maa(idx_z_mid), 55, ZoneColors(i,:), 'filled', 'MarkerEdgeColor','k', 'LineWidth',1.0, 'MarkerFaceAlpha',0.9);
 end
-xlabel(axMain, '\Delta t_{maa}, Apparent Matrix Transit Time (\mus/ft)', 'FontWeight','bold', 'FontSize',12);
-ylabel(axMain, '\rho_{maa}, Apparent Matrix Density (g/cc)', 'FontWeight','bold', 'FontSize',12);
-title(axMain, {'Matrix Identification Plot (MID)'}, 'FontWeight','bold', 'FontSize',14);
-legend(legend_names, 'Location','southwest'); hold(axMain, 'off');
+
+xlabel(axMain, '\Delta t_{maa}, Apparent Matrix Transit Time (\mus/ft)', 'FontWeight','bold', 'FontSize',Label_FS);
+ylabel(axMain, '\rho_{maa}, Apparent Matrix Density (g/cc)', 'FontWeight','bold', 'FontSize',Label_FS);
+title(axMain, {'Matrix Identification Plot (MID)'}, 'FontWeight','bold', 'FontSize',Title_FS);
+legend(legend_names, 'Location','southwest', 'FontSize', Text_FS, 'FontWeight','bold'); hold(axMain, 'off');
+
+exportgraphics(fig_mid, '2_MID_Plot_600DPI.png', 'Resolution', 600);
 
 % -------------------------------------------------------------------------
-% 8.3 SONIC–DENSITY CROSSPLOT
+% 8.3 SONIC–DENSITY CROSSPLOT (PERBAIKAN SKALA & SPASI ANGKA)
 % -------------------------------------------------------------------------
-figure('Name','Sonic-Density Crossplot','Color','w','Position',[50 50 900 800]);
+fig_sd = figure('Name','Sonic-Density Crossplot','Color','w','Position',[50 50 1100 1000]);
 hold on; box on;
-set(gca, 'XLim', [40 120], 'YLim', [1.9 3.0], 'YDir', 'reverse');
-set(gca, 'XTick', 40:2:120, 'YTick', 1.90:0.02:3.00); 
+
+% PERBAIKAN SPASI ANGKA SUMBU (TICK MARKS DIJARANGKAN)
+set(gca, 'XLim', [40 120], 'YLim', [1.9 3.0], 'YDir', 'reverse', 'FontSize', Tick_FS, 'LineWidth', 2.0, 'FontWeight', 'bold');
+% XTicks diubah dari 2 menjadi 10 agar tidak bertumpuk rapat
+set(gca, 'XTick', 40:10:120); 
+% YTicks diubah dari 0.02 menjadi 0.1 agar lega
+set(gca, 'YTick', 1.90:0.1:3.00); 
+
+% Minor tick tetap ada agar grid kecil tetap rapi
+set(gca, 'XMinorTick', 'on', 'YMinorTick', 'on');
 grid on; set(gca, 'GridLineStyle', '-', 'GridColor', [0.5 0.5 0.5], 'GridAlpha', 0.6);
-set(gca, 'FontSize', 10);
-xlabel('Interval Transit Time, \Delta t (\mus/ft)', 'FontSize',12, 'FontWeight','bold');
-ylabel('Bulk Density, \rho_b (g/cc)', 'FontSize',12, 'FontWeight','bold');
-title({'Sonic–Density Crossplot'}, 'FontSize',14, 'FontWeight','bold');
+
+xlabel('Interval Transit Time, \Delta t (\mus/ft)', 'FontSize',Label_FS, 'FontWeight','bold');
+ylabel('Bulk Density, \rho_b (g/cc)', 'FontSize',Label_FS, 'FontWeight','bold');
+title({'Sonic–Density Crossplot'}, 'FontSize',Title_FS, 'FontWeight','bold');
+
 rho_f=1.00; dt_f=189; QZ=[2.65 55.5]; LS=[2.71 47.6]; DL=[2.87 43.5]; AN=[2.98 50.0]; HL=[2.03 67.0];
 phi_fine=(0:0.1:45)/100; phi_tick=(0:1:40)/100;  
 CalcRho = @(rho_ma, phi) (1 - phi) .* rho_ma + phi .* rho_f;
 CalcDt_Wyllie = @(dt_ma, phi) (1 - phi) .* dt_ma + phi .* dt_f;
 CalcDt_RHG = @(dt_ma, phi) dt_ma ./ (1 - 1.6 * phi);
 Matrices = {'Quartz', QZ; 'Calcite', LS; 'Dolomite', DL}; LabelRot = [45, 50, 52];
+
 for i = 1:size(Matrices,1)
     name=Matrices{i,1}; rho_ma=Matrices{i,2}(1); dt_ma=Matrices{i,2}(2);
     rho_c=CalcRho(rho_ma, phi_fine); dt_w=CalcDt_Wyllie(dt_ma, phi_fine); dt_rhg=CalcDt_RHG(dt_ma, phi_fine);
-    plot(dt_w, rho_c, 'r-', 'LineWidth', 1.5); plot(dt_rhg, rho_c, 'k-', 'LineWidth', 2.0); 
+    plot(dt_w, rho_c, 'r-', 'LineWidth', 2.5); plot(dt_rhg, rho_c, 'k-', 'LineWidth', 3.0); 
     rho_t=CalcRho(rho_ma, phi_tick); dt_wt=CalcDt_Wyllie(dt_ma, phi_tick); dt_rt=CalcDt_RHG(dt_ma, phi_tick);
     for j = 1:length(phi_tick)
         p_val = phi_tick(j)*100; 
-        plot(dt_wt(j), rho_t(j), 'r|', 'MarkerSize',6, 'LineWidth',1); plot(dt_rt(j), rho_t(j), 'k|', 'MarkerSize',6, 'LineWidth',1);
+        plot(dt_wt(j), rho_t(j), 'r|', 'MarkerSize',10, 'LineWidth',2.0); plot(dt_rt(j), rho_t(j), 'k|', 'MarkerSize',10, 'LineWidth',2.0);
         if mod(p_val, 10) == 0
-            text(dt_wt(j)+0.5, rho_t(j)+0.01, num2str(p_val), 'Color','r', 'FontSize',9, 'FontWeight','bold', 'Rotation', LabelRot(i)-5, 'HorizontalAlignment','left');
-            text(dt_rt(j)-0.5, rho_t(j)-0.01, num2str(p_val), 'Color','k', 'FontSize',9, 'FontWeight','bold', 'Rotation', LabelRot(i)+5, 'HorizontalAlignment','right');
+            text(dt_wt(j)+0.5, rho_t(j)+0.01, num2str(p_val), 'Color','r', 'FontSize',12, 'FontWeight','bold', 'Rotation', LabelRot(i)-5, 'HorizontalAlignment','left');
+            text(dt_rt(j)-0.5, rho_t(j)-0.01, num2str(p_val), 'Color','k', 'FontSize',12, 'FontWeight','bold', 'Rotation', LabelRot(i)+5, 'HorizontalAlignment','right');
         end
     end
-    plot(dt_ma, rho_ma, 'ko', 'MarkerFaceColor','w', 'MarkerSize', 8); text(dt_ma-1.5, rho_ma-0.03, name, 'FontWeight','bold', 'FontSize',11);
+    plot(dt_ma, rho_ma, 'ko', 'MarkerFaceColor','w', 'MarkerSize', 12, 'LineWidth', 1.5); 
+    text(dt_ma-2.0, rho_ma-0.03, name, 'FontWeight','bold', 'FontSize',Text_FS);
 end
-plot(AN(2), AN(1), 'ko', 'MarkerFaceColor','w', 'MarkerSize',8); text(AN(2)+1.5, AN(1), 'Anhydrite', 'FontSize',10);
-plot(HL(2), HL(1), 'ko', 'MarkerFaceColor','w', 'MarkerSize',8); text(HL(2)+1.5, HL(1), 'Halite', 'FontSize',10);
-idx_bg_sd = idx_formasi & ~isnan(DT) & ~isnan(RHOB);
-scatter(DT(idx_bg_sd), RHOB(idx_bg_sd), 15, [0.6 0.6 0.6], 'filled', 'MarkerEdgeColor','none', 'MarkerFaceAlpha',0.5);
+plot(AN(2), AN(1), 'ko', 'MarkerFaceColor','w', 'MarkerSize',12, 'LineWidth', 1.5); text(AN(2)+2.0, AN(1), 'Anhydrite', 'FontSize',Text_FS, 'FontWeight','bold');
+plot(HL(2), HL(1), 'ko', 'MarkerFaceColor','w', 'MarkerSize',12, 'LineWidth', 1.5); text(HL(2)+2.0, HL(1), 'Halite', 'FontSize',Text_FS, 'FontWeight','bold');
 
+idx_bg_sd = idx_formasi & ~isnan(DT) & ~isnan(RHOB);
+scatter(DT(idx_bg_sd), RHOB(idx_bg_sd), 25, [0.6 0.6 0.6], 'filled', 'MarkerEdgeColor','none', 'MarkerFaceAlpha',0.5);
 h_zones_sd = zeros(1, size(Zona_Kualitatif, 1));
 for i = 1:size(Zona_Kualitatif, 1)
     idx_z = (DEPT >= Zona_Kualitatif(i,1) & DEPT <= Zona_Kualitatif(i,2)) & ~isnan(DT) & ~isnan(RHOB);
-    h_zones_sd(i) = scatter(DT(idx_z), RHOB(idx_z), 35, ZoneColors(i,:), 'filled', 'MarkerEdgeColor','k', 'LineWidth',0.5, 'MarkerFaceAlpha',0.9);
+    h_zones_sd(i) = scatter(DT(idx_z), RHOB(idx_z), 55, ZoneColors(i,:), 'filled', 'MarkerEdgeColor','k', 'LineWidth',1.0, 'MarkerFaceAlpha',0.9);
 end
-h1 = plot(nan,nan, 'k-', 'LineWidth',2); h2 = plot(nan,nan, 'r-', 'LineWidth',1.5);
-legend([h1 h2 h_zones_sd(1)], {'Empirical (Raymer-Hunt-Gardner)', 'Time Average (Wyllie)', 'Zona Potensi'}, 'Location', 'northeast', 'FontSize',10);
+
+h1 = plot(nan,nan, 'k-', 'LineWidth',3.0); h2 = plot(nan,nan, 'r-', 'LineWidth',2.5);
+legend([h1 h2 h_zones_sd(1)], {'Empirical (Raymer-Hunt-Gardner)', 'Time Average (Wyllie)', 'Zona Potensi'}, 'Location', 'northeast', 'FontSize',Text_FS, 'FontWeight','bold');
 hold off;
+
+exportgraphics(fig_sd, '3_Sonic_Density_Crossplot_600DPI.png', 'Resolution', 600);
 
 % -------------------------------------------------------------------------
 % 8.4 NEUTRON-SONIC CROSSPLOT 
 % -------------------------------------------------------------------------
-figure('Name','Neutron-Sonic Crossplot','Color','w','Position',[50 20 950 1050]); 
-title({'Neutron-Sonic Crossplot'}, 'FontWeight','bold', 'FontSize',14);
-ax = axes('Position',[0.12 0.1 0.78 0.85]); 
-hold on; box on; xlim([-5 45]); ylim([40 120]); axis off; 
+fig_ns = figure('Name','Neutron-Sonic Crossplot','Color','w','Position',[50 20 1100 1100]); 
+ax = axes('Position',[0.12 0.1 0.8 0.8]); 
+hold on; box on; 
+set(ax, 'XTick', [], 'YTick', []); 
+title({'Neutron-Sonic Crossplot'}, 'FontWeight','bold', 'FontSize',Title_FS);
+xlim([-5 45]); ylim([40 120]); 
+
 col_major = [0.0 0.3 0.4]; col_minor = [0.0 0.6 0.7]; 
 for x = -5:1:45
     if mod(x,5)==0
-        plot([x x], [40 120], 'Color', col_major, 'LineWidth', 1.0); 
-        text(x, 38.2, num2str(x), 'Horiz','center', 'FontSize',9, 'FontWeight','bold');
+        plot([x x], [40 120], 'Color', col_major, 'LineWidth', 2.0); 
+        text(x, 38.0, num2str(x), 'Horiz','center', 'FontSize',Tick_FS, 'FontWeight','bold');
     else
-        plot([x x], [40 120], 'Color', col_minor, 'LineWidth', 0.5, 'LineStyle', '-'); 
+        plot([x x], [40 120], 'Color', col_minor, 'LineWidth', 1.0, 'LineStyle', '-'); 
     end
 end
 for y = 40:2:120
     if mod(y,10)==0
-        plot([-5 45], [y y], 'Color', col_major, 'LineWidth', 1.0); 
-        text(-5.5, y, num2str(y), 'Horiz','right', 'FontSize',9, 'FontWeight','bold');
+        plot([-5 45], [y y], 'Color', col_major, 'LineWidth', 2.0); 
+        text(-5.5, y, num2str(y), 'Horiz','right', 'FontSize',Tick_FS, 'FontWeight','bold');
     else
-        plot([-5 45], [y y], 'Color', col_minor, 'LineWidth', 0.5, 'LineStyle', '-'); 
+        plot([-5 45], [y y], 'Color', col_minor, 'LineWidth', 1.0, 'LineStyle', '-'); 
     end
 end
 for ym = 140:20:380
     y_ft = ym / 3.28084;
     if y_ft >= 40 && y_ft <= 120
-        plot([45 45.8], [y_ft y_ft], 'Color','k', 'LineWidth',1); 
-        text(46.5, y_ft, num2str(ym), 'Horiz','left', 'FontSize',8, 'Color','k'); 
+        plot([45 45.8], [y_ft y_ft], 'Color','k', 'LineWidth',2.0); 
+        text(46.5, y_ft, num2str(ym), 'Horiz','left', 'FontSize',12, 'Color','k', 'FontWeight','bold'); 
     end
 end
+
 dt_qz=55.5; dt_ls=47.6; dt_dl=43.5; dt_fl=189; phi=0:0.1:46; phi_pct=phi;
 w_qz=(1-phi/100)*dt_qz+(phi/100)*dt_fl; w_ls=(1-phi/100)*dt_ls+(phi/100)*dt_fl; w_dl=(1-phi/100)*dt_dl+(phi/100)*dt_fl;
 pts_n=[0,10,20,30,40,45]; pts_d_qz=[55.5,67.5,84.0,106.0,138.0,158.0]; emp_qz=spline(pts_n,pts_d_qz,phi_pct);
 pts_d_ls=[47.6,58.5,73.0,93.0,120.0,138.0]; emp_ls=spline(pts_n,pts_d_ls,phi_pct); pts_d_dl=[43.5,53.5,66.5,84.0,108.0,124.0]; emp_dl=spline(pts_n,pts_d_dl,phi_pct);
-plot(phi_pct, w_qz, 'r-', 'LineWidth', 1.5); plot(phi_pct, w_ls, 'r-', 'LineWidth', 1.5); plot(phi_pct, w_dl, 'r-', 'LineWidth', 1.5); 
-plot(phi_pct, emp_qz, 'k-', 'LineWidth', 1.8); plot(phi_pct, emp_ls, 'k-', 'LineWidth', 1.8); plot(phi_pct, emp_dl, 'k-', 'LineWidth', 1.8);
-text(9, 63, 'Quartz', 'Rotation',55, 'FontSize',10, 'FontWeight','bold', 'BackgroundColor','w', 'EdgeColor','none'); text(12, 56, 'Calcite', 'Rotation',52, 'FontSize',10, 'FontWeight','bold', 'BackgroundColor','w', 'EdgeColor','none'); text(14, 49, 'Dolomite', 'Rotation',48, 'FontSize',10, 'FontWeight','bold', 'BackgroundColor','w', 'EdgeColor','none');
-plot(0, dt_qz, 'ko','MarkerFaceColor','w'); plot(0, dt_ls, 'ko','MarkerFaceColor','w'); plot(0, dt_dl, 'ko','MarkerFaceColor','w');
-rectangle('Position', [3 105 15 12], 'FaceColor', 'w', 'EdgeColor', 'k', 'LineWidth', 1.5); plot([4 8], [113 113], 'r-', 'LineWidth', 2); text(9, 113, 'Time Average', 'FontSize',9, 'FontWeight','bold'); plot([4 8], [109 109], 'k-', 'LineWidth', 2); text(9, 109, 'Empirical', 'FontSize',9, 'FontWeight','bold');
-rectangle('Position', [24 45 20 5], 'FaceColor', 'w', 'EdgeColor', 'k', 'LineWidth', 1.0); text(34, 47.5, ['\Delta t_f = ' num2str(dt_fl) ' \mu s/ft'], 'Horiz','center', 'FontSize',9, 'FontWeight','bold');
+
+plot(phi_pct, w_qz, 'r-', 'LineWidth', 2.5); plot(phi_pct, w_ls, 'r-', 'LineWidth', 2.5); plot(phi_pct, w_dl, 'r-', 'LineWidth', 2.5); 
+plot(phi_pct, emp_qz, 'k-', 'LineWidth', 3.0); plot(phi_pct, emp_ls, 'k-', 'LineWidth', 3.0); plot(phi_pct, emp_dl, 'k-', 'LineWidth', 3.0);
+
+text(11, 55.5 + 11*1.335, '  Quartz  ', 'Rotation',45, 'FontSize',Text_FS, 'FontWeight','bold', 'BackgroundColor','w', 'EdgeColor','none', 'HorizontalAlignment', 'center'); 
+text(16, 47.6 + 16*1.414, '  Calcite  ', 'Rotation',47, 'FontSize',Text_FS, 'FontWeight','bold', 'BackgroundColor','w', 'EdgeColor','none', 'HorizontalAlignment', 'center'); 
+text(21, 43.5 + 21*1.455, '  Dolomite  ', 'Rotation',48, 'FontSize',Text_FS, 'FontWeight','bold', 'BackgroundColor','w', 'EdgeColor','none', 'HorizontalAlignment', 'center');
+
+plot(0, dt_qz, 'ko','MarkerFaceColor','w', 'MarkerSize', 10, 'LineWidth', 1.5); 
+plot(0, dt_ls, 'ko','MarkerFaceColor','w', 'MarkerSize', 10, 'LineWidth', 1.5); 
+plot(0, dt_dl, 'ko','MarkerFaceColor','w', 'MarkerSize', 10, 'LineWidth', 1.5);
+
+rectangle('Position', [1 103 26 15], 'FaceColor', 'w', 'EdgeColor', 'k', 'LineWidth', 2.0); 
+plot([3 7], [113 113], 'r-', 'LineWidth', 3.0); text(9, 113, 'Time Average', 'FontSize',Text_FS, 'FontWeight','bold'); 
+plot([3 7], [107 107], 'k-', 'LineWidth', 3.0); text(9, 107, 'Empirical', 'FontSize',Text_FS, 'FontWeight','bold');
+
+rectangle('Position', [22 43 23 7], 'FaceColor', 'w', 'EdgeColor', 'k', 'LineWidth', 1.5); 
+text(33.5, 46.5, ['\Delta t_f = ' num2str(dt_fl) ' \mu s/ft'], 'Horiz','center', 'FontSize',Text_FS, 'FontWeight','bold');
+
 NPHI_pct = NPHI * 100; 
 idx_bg_ns = idx_formasi & ~isnan(DT) & ~isnan(NPHI);
-scatter(NPHI_pct(idx_bg_ns), DT(idx_bg_ns), 15, [0.6 0.6 0.6], 'filled', 'MarkerEdgeColor','none', 'MarkerFaceAlpha',0.5);
+scatter(NPHI_pct(idx_bg_ns), DT(idx_bg_ns), 25, [0.6 0.6 0.6], 'filled', 'MarkerEdgeColor','none', 'MarkerFaceAlpha',0.5);
 
 for i = 1:size(Zona_Kualitatif, 1)
     idx_z = (DEPT >= Zona_Kualitatif(i,1) & DEPT <= Zona_Kualitatif(i,2)) & ~isnan(DT) & ~isnan(NPHI);
-    scatter(NPHI_pct(idx_z), DT(idx_z), 35, ZoneColors(i,:), 'filled', 'MarkerEdgeColor','k', 'LineWidth',0.5, 'MarkerFaceAlpha',0.9);
+    scatter(NPHI_pct(idx_z), DT(idx_z), 55, ZoneColors(i,:), 'filled', 'MarkerEdgeColor','k', 'LineWidth',1.0, 'MarkerFaceAlpha',0.9);
 end
 hold off;
+
+exportgraphics(fig_ns, '4_Neutron_Sonic_Crossplot_600DPI.png', 'Resolution', 600);
 %% ========================================================================
 %           8.5 TABEL KESIMPULAN CROSSPLOT (LITHOLOGY SUMMARY TABLE)
 % =========================================================================
 calc_rho_from_dt = @(dt_log, rho_m, dt_m) ...
     (1 - (0.625 * (1 - dt_m./dt_log))) * rho_m + (0.625 * (1 - dt_m./dt_log)) * 1.0;
-
 fprintf('\n==========================================================================================================================\n');
 fprintf('                             TABLE: COMPARISON OF LITHOLOGY ESTIMATION FROM VARIOUS CROSSPLOTS\n');
 fprintf('==========================================================================================================================\n');
@@ -609,12 +706,11 @@ fprintf('        |                 |--------------------------------------------
 fprintf('  Zone  |   Zone Range    |   Neutron-Density   |    Sonic-Density    |    Neutron-Sonic    |      MID Plot      |\n');
 fprintf('        |      (ft)       |      Crossplot      |      Crossplot      |      Crossplot      |                    |\n');
 fprintf('--------------------------------------------------------------------------------------------------------------------------\n');
-
 for i = 1:size(Zona_Kualitatif, 1)
     z_top = Zona_Kualitatif(i,1);
     z_bot = Zona_Kualitatif(i,2);
     
-    % Menggunakan filter valid_log (mengabaikan data washout 6600-6800 ft)
+    % Menggunakan filter valid_log (mengabaikan data washout)
     idx = (DEPT >= z_top & DEPT <= z_bot) & valid_log & ~isnan(RHOB) & ~isnan(NPHI) & ~isnan(DT);
     
     if sum(idx) == 0
@@ -629,8 +725,7 @@ for i = 1:size(Zona_Kualitatif, 1)
     
     % --- 1. LITHOLOGY DARI NPHI-RHOB ---
     rho_maa_val = (R_m - N_m*1.0) / (1 - N_m);
-    
-    if rho_maa_val < 2.68 % Gabungan < 2.60 dan < 2.68 dari kode lama
+    if rho_maa_val < 2.68 
         lit_ND = 'Gas Effect'; 
     elseif rho_maa_val < 2.80
         lit_ND = 'Limestone';          
@@ -642,10 +737,8 @@ for i = 1:size(Zona_Kualitatif, 1)
     rho_QZ = calc_rho_from_dt(D_m, 2.65, 55.5);
     rho_LS = calc_rho_from_dt(D_m, 2.71, 47.6);
     rho_DL = calc_rho_from_dt(D_m, 2.87, 43.5);
-    
     [~, min_id_SD] = min(abs(R_m - [rho_QZ, rho_LS, rho_DL]));
-    nama_lit_SD = {'Gas Effect', 'Limestone', 'Dolomite'}; % App. Quartz diubah jadi Gas Effect
-    
+    nama_lit_SD = {'Gas Effect', 'Limestone', 'Dolomite'}; 
     if R_m < (rho_QZ - 0.05)
         lit_SD = 'Gas Effect';     
     else
@@ -654,8 +747,7 @@ for i = 1:size(Zona_Kualitatif, 1)
     
     % --- 3. LITHOLOGY DARI NPHI-DT ---
     dt_maa_val = (D_m - N_m*189) / (1 - N_m);
-    
-    if dt_maa_val > 51 % Gabungan > 58 dan > 51 dari kode lama
+    if dt_maa_val > 51 
         lit_NS = 'Gas Effect'; 
     elseif dt_maa_val > 44
         lit_NS = 'Limestone';
@@ -667,13 +759,11 @@ for i = 1:size(Zona_Kualitatif, 1)
     d1 = sqrt((dt_maa_val - 55.5)^2 + (50*(rho_maa_val - 2.65))^2);
     d2 = sqrt((dt_maa_val - 47.6)^2 + (50*(rho_maa_val - 2.71))^2);
     d3 = sqrt((dt_maa_val - 43.5)^2 + (50*(rho_maa_val - 2.87))^2);
-    
     [~, min_id_MID] = min([d1, d2, d3]);
-    
     if rho_maa_val < 2.60 || dt_maa_val > 58
         lit_MID = 'Gas Effect';
     else
-        lit_MID = nama_lit_SD{min_id_MID}; % Menggunakan nama_lit_SD yang baru
+        lit_MID = nama_lit_SD{min_id_MID}; 
     end
     
     % Print tabel
@@ -681,212 +771,334 @@ for i = 1:size(Zona_Kualitatif, 1)
             i, z_top, z_bot, lit_ND, lit_SD, lit_NS, lit_MID);
 end
 fprintf('==========================================================================================================================\n\n');
+%% ========================================================================
+%             SAFETY CLAMP (PEMBATAS FISIKA UNTUK HASIL AKHIR)
+% =========================================================================
+% Membuat variabel final agar plot dan Excel tidak meledak dari skala 0-1
+Vsh_Final = Vsh; 
+Vsh_Final(Vsh_Final < 0) = 0; 
+Vsh_Final(Vsh_Final > 1) = 1; 
+
+Sw_Final = Sw;
+Sw_Final(phi_eff <= 0.01) = 1; 
+Sw_Final(Sw_Final > 1) = 1;    
+Sw_Final(Sw_Final < 0) = 0;    
 
 %% ========================================================================
-%        9. WELL LOG VISUALIZATION – TECHLOG STYLE (INTERACTIVE UI)
+%        9. WELL LOG VISUALIZATION – JOURNAL PUBLICATION READY
 % =========================================================================
-% 9.1 Definisi Logika Flags & Lithology (Diperbarui)
-% KOREKSI: Mengecualikan data rusak sesuai QC data LAS terbaru
+% 9.1 Definisi Logika Flags & Lithology
 valid_log = ~(DEPT >= 6600 & DEPT <= 6800);
-
 LithCode = NaN(size(DEPT));
-LithCode(Vsh > CO_Vsh) = 1;                                      
-LithCode(Vsh <= CO_Vsh & phi_eff < CO_Phi) = 2;                  
-LithCode(Vsh <= CO_Vsh & phi_eff >= CO_Phi & Sw > CO_Sw) = 3;    
-LithCode(Vsh <= CO_Vsh & phi_eff >= CO_Phi & Sw <= CO_Sw) = 4;   
-
+LithCode(Vsh_Final > CO_Vsh) = 1;                                      
+LithCode(Vsh_Final <= CO_Vsh & phi_eff < CO_Phi) = 2;                  
+LithCode(Vsh_Final <= CO_Vsh & phi_eff >= CO_Phi & Sw_Final > CO_Sw) = 3;    
+LithCode(Vsh_Final <= CO_Vsh & phi_eff >= CO_Phi & Sw_Final <= CO_Sw) = 4;   
 GR_cutoff = GR_clean + (CO_Vsh * (GR_shale - GR_clean));
 
-% WAJIB ADA: Perhitungan Dinamis Reservoir & Pay Flag
-netResFlag = (Vsh <= CO_Vsh) & (phi_eff >= CO_Phi) & valid_log;
-netPayFlag = netResFlag & (Sw <= CO_Sw) & valid_log;
+netResFlag = (Vsh_Final <= CO_Vsh) & (phi_eff >= CO_Phi) & valid_log;
+netPayFlag = netResFlag & (Sw_Final <= CO_Sw) & valid_log;
+netResFlag(isnan(Vsh_Final) | isnan(phi_eff)) = 0;
+netPayFlag(isnan(Vsh_Final) | isnan(phi_eff) | isnan(Sw_Final)) = 0;
 
-netResFlag(isnan(Vsh) | isnan(phi_eff)) = 0;
-netPayFlag(isnan(Vsh) | isnan(phi_eff) | isnan(Sw)) = 0;
-
-% --- 9.2 VISUALIZATION SETUP ---
+% --- PENGATURAN UMUM VISUALISASI JURNAL ---
 font_name = 'Arial';
 grid_color = [0.75 0.75 0.75]; 
-axis_size = 8;
-figure('Name','TUGAS AKHIR GABE - FULL WELL LOG VISUALIZATION','Color','w','Position',[50 50 1600 900], 'NumberTitle','off');
+axis_size = 9;
+margin_left = 0.08; margin_right = 0.05; margin_bottom = 0.05; 
+h_header = 0.10; h_track = 0.82; gap = 0.005;
+y_header = margin_bottom + h_track; y_track = margin_bottom;
 
-margin_left   = 0.05; margin_right  = 0.05; margin_bottom = 0.05; 
-h_header      = 0.12; h_track       = 0.78; gap           = 0.002;
-total_width   = 1.0 - margin_left - margin_right;
-w_lith        = 0.04; w_remaining   = total_width - w_lith - (6 * gap);
-w_other       = w_remaining / 6; 
-y_header = margin_bottom + h_track; y_track  = margin_bottom;
+disp('=> Sedang menggambar dan mengekspor visualisasi ke resolusi 600 DPI...');
 
-axes('Position',[margin_left, y_header, w_lith, h_header]); 
-axis off; rectangle('Position',[0 0 1 1],'LineWidth',1);
-text(0.5, 0.5, {'LITHOLOGY'}, 'Horiz','center', 'FontWeight','bold', 'FontSize',7);
-curr_x = margin_left + w_lith + gap;
+%% ========================================================================
+%  FIGURE 1: TRIPLE COMBO LOG (GR, RESISTIVITY, DENSITY-NEUTRON)
+% =========================================================================
+fig_tc = figure('Name','Triple Combo Log','Color','w','Position',[50 50 1000 800], 'NumberTitle','off');
+total_width_tc = 1.0 - margin_left - margin_right;
+w_tc = (total_width_tc - (2 * gap)) / 3; 
 
-labels = {
+lbl_tc = {
     {'GAMMA RAY', '(API)', '0', '150'}, ...          
     {'RESISTIVITY', '(OHM.M)', '0.2', '2000'}, ...   
-    {'RHOB (Red) / NPHI (Blue)', '(G/CC) / (V/V)', '1.7 / 0.6', '2.7 / 0'}, ...
-    {'VSHALE', '(%)', '0', '1'}, ...               
-    {'EFFECTIVE POROSITY', '(%)', '0', '1'}, ...           
-    {'WATER SATURATION', '(%)', '0', '1'}                
+    {'RHOB (Red) / NPHI (Blue)', '(G/CC) / (V/V)', '1.7 / 0.6', '2.7 / 0'} ...
 };
 
-for i = 1:6
-    axes('Position',[curr_x, y_header, w_other, h_header]); axis off; 
+ax_tc = gobjects(1, 3);
+curr_x = margin_left;
+for i = 1:3
+    % Header
+    axes('Position',[curr_x, y_header, w_tc, h_header]); axis off; 
     rectangle('Position',[0 0 1 1],'LineWidth',1); 
-    text(0.5, 0.75, labels{i}{1}, 'Horiz','center','FontWeight','bold','FontSize',8);
-    text(0.5, 0.55, labels{i}{2}, 'Horiz','center','FontSize',7,'FontAngle','italic');
-    text(0.02, 0.1, labels{i}{3}, 'Horiz','left','FontSize',7,'FontWeight','bold');
-    text(0.98, 0.1, labels{i}{4}, 'Horiz','right','FontSize',7,'FontWeight','bold');
-    curr_x = curr_x + w_other + gap;
-end
-
-total_tracks = 7; ax_handles = gobjects(1, total_tracks);
-ax0 = axes('Position', [margin_left, y_track, w_lith, h_track]); ax_handles(1) = ax0;
-curr_x = margin_left + w_lith + gap;
-for i = 2:total_tracks
-    ax_handles(i) = axes('Position', [curr_x, y_track, w_other, h_track]);
-    curr_x = curr_x + w_other + gap;
-end
-
-for i = 1:total_tracks
-    set(ax_handles(i), 'FontName', font_name, 'FontSize', axis_size, ...
-        'Box', 'on', 'LineWidth', 1.0, 'TickDir', 'out', 'XColor', 'k', 'YColor', 'k', 'YDir', 'reverse', ...
-        'XAxisLocation', 'bottom', 'XTickLabel', [], 'XGrid', 'on', 'YGrid', 'on', 'GridColor', grid_color, 'GridAlpha', 0.8, ...
+    text(0.5, 0.75, lbl_tc{i}{1}, 'Horiz','center','FontWeight','bold','FontSize',10);
+    text(0.5, 0.45, lbl_tc{i}{2}, 'Horiz','center','FontSize',9,'FontAngle','italic');
+    text(0.02, 0.1, lbl_tc{i}{3}, 'Horiz','left','FontSize',9,'FontWeight','bold');
+    text(0.98, 0.1, lbl_tc{i}{4}, 'Horiz','right','FontSize',9,'FontWeight','bold');
+    
+    % Track
+    ax_tc(i) = axes('Position', [curr_x, y_track, w_tc, h_track]);
+    set(ax_tc(i), 'FontName', font_name, 'FontSize', axis_size, 'Box', 'on', 'LineWidth', 1.0, ...
+        'TickDir', 'out', 'XColor', 'k', 'YColor', 'k', 'YDir', 'reverse', 'XAxisLocation', 'bottom', ...
+        'XTickLabel', [], 'XGrid', 'on', 'YGrid', 'on', 'GridColor', grid_color, 'GridAlpha', 0.8, ...
         'XMinorGrid', 'on', 'YMinorGrid', 'on', 'MinorGridColor', grid_color, 'MinorGridAlpha', 0.4);
-    hold(ax_handles(i), 'on');
+    hold(ax_tc(i), 'on');
+    curr_x = curr_x + w_tc + gap;
 end
-ax0=ax_handles(1); ax1=ax_handles(2); ax2=ax_handles(3); ax3=ax_handles(4); 
-ax4=ax_handles(5); ax5=ax_handles(6); ax6=ax_handles(7);
 
-%% TRACK 1: LITHOLOGY 
-axes(ax0); 
-if ~isempty(DEPT)
-    lith_segments = []; current_lith = LithCode(1); top_z = DEPT(1);
-    for i = 2:length(DEPT)
-        if LithCode(i) ~= current_lith || i == length(DEPT)
-            base_z = DEPT(i-1); if i == length(DEPT), base_z = DEPT(i); end 
-            if ~isnan(current_lith), lith_segments = [lith_segments; current_lith, top_z, base_z]; end
-            current_lith = LithCode(i); top_z = DEPT(i);
-        end
-    end
-    for k_idx = 1:size(lith_segments, 1)
-        code = lith_segments(k_idx, 1); z1 = lith_segments(k_idx, 2); z2 = lith_segments(k_idx, 3); thick = z2 - z1;
-        switch code
-            case 1, patch([0 1 1 0], [z1 z1 z2 z2], 'k', 'FaceColor', [0.1 0.5 0.1], 'EdgeColor', 'none'); 
-            case 2, patch([0 1 1 0], [z1 z1 z2 z2], 'k', 'FaceColor', [1 1 0], 'EdgeColor', 'none');
-                density = 5; num_dots = ceil(thick * density);
-                if num_dots > 0
-                    xr = rand(num_dots, 1); yr = z1 + (z2-z1) .* rand(num_dots, 1);
-                    scatter(xr, yr, 2, 'k', 'filled', 'MarkerFaceAlpha', 0.5);
-                end
-            case 3, patch([0 1 1 0], [z1 z1 z2 z2], 'k', 'FaceColor', [0.2 0.6 1.0], 'EdgeColor', 'none');
-                step_lime = 15; 
-                if thick > 5 
-                    for yg = z1:step_lime:z2
-                        plot([0 1], [yg yg], 'k-', 'LineWidth', 0.6); 
-                        if mod(yg, step_lime*2) == 0, plot([0.5 0.5], [yg yg+step_lime], 'k-', 'LineWidth', 0.6); 
-                        else, plot([0.25 0.25], [yg yg+step_lime], 'k-', 'LineWidth', 0.6); plot([0.75 0.75], [yg yg+step_lime], 'k-', 'LineWidth', 0.6); end
-                    end
-                end
-            case 4, patch([0 1 1 0], [z1 z1 z2 z2], 'k', 'FaceColor', [0.5 0.3 0.1], 'EdgeColor', 'none');
-        end
-    end
-end
-xlim([0 1]); xticks([]); xlabel('LITHOLOGY','FontWeight','bold'); ylabel('Depth (ft)','FontWeight','bold');
+% Plot GR
+axes(ax_tc(1)); 
+hold on;
 
-%% TRACK 2: GAMMA RAY
-axes(ax1); plot(GR, DEPT,'g','LineWidth',1.3);
+% 1. Logika Shading 
 for i = 1:length(DEPT)-1
     if isnan(GR(i)) || isnan(GR(i+1)); continue; end
-    if GR(i) <= GR_cutoff, col = [1 1 0]; else, col = [0 0.6 0]; end
-    patch([GR(i) GR_cutoff GR_cutoff GR(i)], [DEPT(i) DEPT(i) DEPT(i+1) DEPT(i+1)], col, 'FaceAlpha',0.35, 'EdgeColor','none');
+    
+    if GR(i) <= GR_cutoff
+        col = [1 1 0]; % Kuning cerah (Zona Permeabel)
+    else
+        col = [0 0.6 0]; % Hijau (Zona Shale)
+    end
+    patch([GR(i) GR_cutoff GR_cutoff GR(i)], [DEPT(i) DEPT(i) DEPT(i+1) DEPT(i+1)], col, 'FaceAlpha', 0.35, 'EdgeColor', 'none');
 end
-xline(GR_cutoff,'r--','LineWidth',1.2); xlim([0 150]); xticks([0 50 100 150]);
 
-%% TRACK 3: RESISTIVITY
-axes(ax2); LLD_plot = LLD; LLS_plot = LLS; LLD_plot(LLD_plot<=0) = NaN; LLS_plot(LLS_plot<=0) = NaN; 
-semilogx(LLD_plot, DEPT, 'r', 'LineWidth', 1.4); semilogx(LLS_plot, DEPT, 'm', 'LineWidth', 0.8);
-set(gca,'XScale','log'); xlim([0.2 2000]); xticks([0.2 1 10 100 1000 2000]); grid on;
-legend({'LLD','LLS'},'TextColor','k','Location','southeast','FontSize',6);
+% 2. Plot Garis Log dan Garis Cut-off
+plot(GR, DEPT, 'g', 'LineWidth', 1.5);
+xline(GR_cutoff, 'r--', 'LineWidth', 1.3);
 
-%% TRACK 4: DENSITY–NEUTRON 
-axes(ax3); NPHI_scaled = 2.7 - (NPHI .* (1.0/0.6)); separation = NPHI_scaled - RHOB;
+% Pengaturan Sumbu (TANPA MENGUBAH GRID)
+xlim([0 150]); xticks([0 50 100 150]); 
+ylabel('Depth (ft)', 'FontWeight', 'bold', 'FontSize', 11);
+
+% -----------------------------------------------------------------
+% Plot Resistivity
+axes(ax_tc(2)); LLD_plot = LLD; LLS_plot = LLS; LLD_plot(LLD_plot<=0)=NaN; LLS_plot(LLS_plot<=0)=NaN; 
+semilogx(LLD_plot, DEPT, 'r', 'LineWidth', 1.5); semilogx(LLS_plot, DEPT, 'm', 'LineWidth', 1.0);
+set(gca,'XScale','log'); xlim([0.2 2000]); xticks([0.2 1 10 100 1000 2000]); set(gca,'YTickLabel',[]);
+
+% Plot Density-Neutron
+axes(ax_tc(3)); NPHI_scaled = 2.7 - (NPHI .* (1.0/0.6)); separation = NPHI_scaled - RHOB;
 for i = 1:length(DEPT)-1
     if isnan(RHOB(i)) || isnan(NPHI_scaled(i)); continue; end
     if separation(i) > 0, patch([RHOB(i) NPHI_scaled(i) NPHI_scaled(i) RHOB(i)], [DEPT(i) DEPT(i) DEPT(i+1) DEPT(i+1)], [1 1 0], 'FaceAlpha', 0.8, 'EdgeColor', 'none');
     else, patch([RHOB(i) NPHI_scaled(i) NPHI_scaled(i) RHOB(i)], [DEPT(i) DEPT(i) DEPT(i+1) DEPT(i+1)], [0 0.6 0], 'FaceAlpha', 0.6, 'EdgeColor', 'none'); end
 end
-plot(RHOB, DEPT, 'r', 'LineWidth', 1.5); plot(NPHI_scaled, DEPT, 'b--', 'LineWidth', 1.2); 
-xlim([1.7 2.7]); xticks([1.7 1.95 2.2 2.45 2.7]);
+plot(RHOB, DEPT, 'r', 'LineWidth', 1.5); plot(NPHI_scaled, DEPT, 'b--', 'LineWidth', 1.5); 
+xlim([1.7 2.7]); xticks([1.7 1.95 2.2 2.45 2.7]); set(gca,'YTickLabel',[]);
 
-%% TRACK 5: VSHALE
-axes(ax4); plot(Vsh, DEPT, 'Color', [0.4 0.3 0.1], 'LineWidth', 1.2); 
-for i = 1:length(DEPT)-1
-    if isnan(Vsh(i)) || isnan(Vsh(i+1)); continue; end
-    patch([Vsh(i) 1 1 Vsh(i)], [DEPT(i) DEPT(i) DEPT(i+1) DEPT(i+1)], [0.7 0.7 0.7], 'FaceAlpha', 0.5, 'EdgeColor', 'none'); 
-end
-xline(CO_Vsh, 'r--', 'LineWidth', 1.5); xlim([0 1]); xticks([0 0.25 0.5 0.75 1]);
+% Link & Set Kujung Limit
+linkaxes(ax_tc,'y'); set(ax_tc(1), 'YLim', [Top_Formasi Base_Formasi]);
 
-%% TRACK 6: EFFECTIVE POROSITY
-axes(ax5); plot(phi_eff, DEPT, 'c', 'LineWidth', 1.5);
-xline(CO_Phi, 'r--', 'LineWidth', 1.5); xlim([0 1]); xticks([0 0.25 0.5 0.75 1]); set(gca, 'XDir', 'normal');
-
-%% TRACK 7: WATER SATURATION
-axes(ax6); plot(Sw,DEPT,'y','LineWidth',1.5);
-xline(CO_Sw, 'r--', 'LineWidth', 1.5); xlim([0 1]); xticks([0 0.25 0.5 0.75 1]);
-
-%% 9.3 PEMBUATAN SHADING FLAG (EDGE BANDING) - FAST VECTORIZED METHOD
-target_axes = [ax4, ax5, ax6]; % Hanya diterapkan di Track Vsh, Phi, Sw
-
-for i = 1:length(target_axes)
-    ax_target = target_axes(i);
-    axes(ax_target); hold on;
-    
-    xl = xlim();
-    x_span = xl(2) - xl(1);
-    strip_width = x_span * 0.05; % Lebar pita shading 5% dari lebar track
-    
-    % Koordinat Kiri untuk Reservoir (Hijau) & Kanan untuk Net Pay (Merah)
-    x_res_bounds = [xl(1), xl(1) + strip_width];
-    x_pay_bounds = [xl(2) - strip_width, xl(2)];
-    
-    % Eksekusi fungsi gambar matriks
-    func_draw_patches_fast(ax_target, DEPT, netResFlag, x_res_bounds, [0.0 0.8 0.0], 0.8);
-    func_draw_patches_fast(ax_target, DEPT, netPayFlag, x_pay_bounds, [1.0 0.0 0.0], 0.8);
-end
-
-%% LINK DEPTH AXIS 
-linkaxes(ax_handles,'y');
+% EXPORT TRIPLE COMBO
+exportgraphics(fig_tc, 'Triple_Combo_Kujung_600DPI.png', 'Resolution', 600);
 
 %% ========================================================================
-%                           UI CONTROLS (SCROLL & ZOOM)
+%  FIGURE 2: PETROPHYSICAL LOG (VSH, PHI, SW) - CLEAN VERSION (NO CUT-OFF LINES)
 % =========================================================================
-gui_data.axes_handles = ax_handles;
-gui_data.min_depth = min(DEPT); 
-gui_data.max_depth = max(DEPT);
-gui_data.dept_range = gui_data.max_depth - gui_data.min_depth;
-gui_data.Top_Formasi = Top_Formasi;
-gui_data.Base_Formasi = Base_Formasi;
+fig_petro = figure('Name','Petrophysical Log','Color','w','Position',[100 100 1000 850], 'NumberTitle','off');
 
-uicontrol('Style', 'text', 'String', 'Scale:', 'Units', 'normalized', ...
-    'Position', [0.82 0.01 0.04 0.02], 'BackgroundColor','w', 'FontWeight','bold');
+% Penyesuaian Lebar (Lithology Dihapus, Lebar dibagi 3 Rata)
+margin_left = 0.08; margin_right = 0.05; margin_bottom = 0.05; 
+h_header = 0.12; h_track = 0.82; gap = 0.005;
+y_header = margin_bottom + h_track; y_track = margin_bottom;
+total_width_petro = 1.0 - margin_left - margin_right;
+w_pet = (total_width_petro - (2 * gap)) / 3;
 
-gui_data.menu_scale = uicontrol('Style', 'popupmenu', ...
-    'String', {'Full Log', 'Kujung Formation', '1000 ft', '500 ft', '200 ft', '100 ft'}, ...
-    'Units', 'normalized', 'Position', [0.87 0.015 0.08 0.025], 'Callback', @update_view);
+lbl_pet = {
+    {'VSHALE', '(%)', '0', '1'}, ...               
+    {'EFFECTIVE POROSITY', '(%)', '0', '1'}, ...           
+    {'WATER SATURATION', '(%)', '0', '1'}                
+};
+
+% Track Vsh, Phi, Sw
+ax_pet = gobjects(1, 3); curr_x = margin_left;
+for i = 1:3
+    % 1. Menggambar Header (Ukuran Font Diperbesar)
+    axes('Position',[curr_x, y_header, w_pet, h_header]); axis off; 
+    rectangle('Position',[0 0 1 1],'LineWidth',1); 
     
-gui_data.slider = uicontrol('Style', 'slider', ...
-    'Min', gui_data.min_depth, 'Max', gui_data.max_depth, 'Value', gui_data.max_depth, ... 
-    'Units', 'normalized', 'Position', [0.96 margin_bottom 0.02 h_track], 'Callback', @update_view); 
+    % Judul Track (Misal diperbesar menjadi 14)
+    text(0.5, 0.70, lbl_pet{i}{1}, 'Horiz','center','FontWeight','bold','FontSize',14);
     
-gui_data.lbl_depth = uicontrol('Style', 'text', 'String', 'Top: 0', ...
-    'Units', 'normalized', 'Position', [0.95 (margin_bottom-0.03) 0.04 0.02], ...
-    'BackgroundColor','w', 'FontSize', 8);
+    % Satuan (%) -> INI YANG ANDA CARI (Diperbesar menjadi 15)
+    text(0.5, 0.30, lbl_pet{i}{2}, 'Horiz','center','FontSize',15,'FontWeight','bold');
+    
+    % Skala 0 dan 1 (Diperbesar menjadi 12)
+    text(0.02, 0.1, lbl_pet{i}{3}, 'Horiz','left','FontSize',12,'FontWeight','bold');
+    text(0.98, 0.1, lbl_pet{i}{4}, 'Horiz','right','FontSize',12,'FontWeight','bold');
+    
+    % 2. Menggambar Area Plotting
+    ax_pet(i) = axes('Position', [curr_x, y_track, w_pet, h_track]);
+    set(ax_pet(i), 'FontName', font_name, 'FontSize', axis_size, 'Box', 'on', 'LineWidth', 1.0, ...
+        'TickDir', 'out', 'XColor', 'k', 'YColor', 'k', 'YDir', 'reverse', 'XAxisLocation', 'bottom', ...
+        'XTickLabel', [], 'XGrid', 'on', 'YGrid', 'on', 'GridColor', grid_color, 'GridAlpha', 0.8, ...
+        'XMinorGrid', 'on', 'YMinorGrid', 'on', 'MinorGridColor', grid_color, 'MinorGridAlpha', 0.4);
+    
+    % Hanya tampilkan label angka kedalaman di track paling kiri (VSH)
+    if i == 1
+        ylabel(ax_pet(i), 'Depth (ft)', 'FontWeight', 'bold', 'FontSize', 11);
+    else
+        set(ax_pet(i), 'YTickLabel', []);
+    end
+    
+    hold(ax_pet(i), 'on'); 
+    curr_x = curr_x + w_pet + gap;
+end
 
-set(gcf, 'UserData', gui_data); 
-update_view(gui_data.menu_scale, []); % Inisialisasi tampilan awal
+% ---------------------------------------------------------
+% Plot Track 1: Vshale (Sesuai Gambar: Arsiran Abu-abu)
+% ---------------------------------------------------------
+axes(ax_pet(1)); 
+% Arsir terlebih dahulu agar garis log berada di depan arsiran
+for i = 1:length(DEPT)-1
+    if isnan(Vsh_Final(i)) || isnan(Vsh_Final(i+1)); continue; end
+    patch([Vsh_Final(i) 1 1 Vsh_Final(i)], [DEPT(i) DEPT(i) DEPT(i+1) DEPT(i+1)], [0.85 0.85 0.85], 'FaceAlpha', 1.0, 'EdgeColor', 'none'); 
+end
+plot(Vsh_Final, DEPT, 'Color', [0.4 0.3 0.1], 'LineWidth', 1.5); % Garis coklat
+xlim([0 1]); xticks([0 0.25 0.5 0.75 1]);
 
+% MEMUNCULKAN GRID: Paksa garis kotak-kotak tampil di lapisan paling atas
+set(ax_pet(1), 'Layer', 'top');
+
+% ---------------------------------------------------------
+% Plot Track 2: Porosity (Sesuai Gambar: Tanpa Arsiran, Cyan)
+% ---------------------------------------------------------
+axes(ax_pet(2)); 
+plot(phi_eff, DEPT, 'c', 'LineWidth', 1.5);
+% xline(CO_Phi, 'r--', 'LineWidth', 1.5); % DIMATIKAN
+xlim([0 1]); xticks([0 0.25 0.5 0.75 1]); set(gca, 'XDir', 'normal');
+
+% ---------------------------------------------------------
+% Plot Track 3: Water Saturation (Sesuai Gambar: Tanpa Arsiran, Kuning)
+% ---------------------------------------------------------
+axes(ax_pet(3)); 
+plot(Sw_Final, DEPT, 'y', 'LineWidth', 1.5);
+% xline(CO_Sw, 'r--', 'LineWidth', 1.5); % DIMATIKAN
+xlim([0 1]); xticks([0 0.25 0.5 0.75 1]);
+
+% ---------------------------------------------------------
+% Link Sumbu Kedalaman & Set Skala
+% ---------------------------------------------------------
+linkaxes(ax_pet,'y'); 
+set(ax_pet(1), 'YLim', [Top_Formasi Base_Formasi]);
+
+% =========================================================================
+% EXPORT PETROPHYSICS KE RESOLUSI TINGGI
+% =========================================================================
+exportgraphics(fig_petro, 'Petrophysics_Kujung_Clean_600DPI.png', 'Resolution', 600);
+fprintf('=> Sukses! Gambar Petrophysics Log (Tanpa Litho & Tanpa Cut-off) High-Res telah disimpan.\n');
+
+%% ========================================================================
+%  FIGURE 3: NET RESERVOIR & NET PAY IDENTIFICATION (WITH CUT-OFF & FLAGS)
+% =========================================================================
+fig_pay = figure('Name','Net Pay & Reservoir Log','Color','w','Position',[200 150 1000 850], 'NumberTitle','off');
+
+% Penyesuaian Lebar
+margin_left = 0.08; margin_right = 0.05; margin_bottom = 0.05; 
+h_header = 0.12; h_track = 0.82; gap = 0.005;
+y_header = margin_bottom + h_track; y_track = margin_bottom;
+total_width_petro = 1.0 - margin_left - margin_right;
+w_pet = (total_width_petro - (2 * gap)) / 3;
+
+lbl_pet = {
+    {'VSHALE', '(%)', '0', '1'}, ...               
+    {'EFFECTIVE POROSITY', '(%)', '0', '1'}, ...           
+    {'WATER SATURATION', '(%)', '0', '1'}                
+};
+
+% Track Vsh, Phi, Sw
+ax_pay = gobjects(1, 3); curr_x = margin_left;
+for i = 1:3
+    % 1. Menggambar Header (Ukuran Font Diperbesar Sesuai Permintaan)
+    axes('Position',[curr_x, y_header, w_pet, h_header]); axis off; 
+    rectangle('Position',[0 0 1 1],'LineWidth',1); 
+    
+    % Judul Track
+    text(0.5, 0.70, lbl_pet{i}{1}, 'Horiz','center','FontWeight','bold','FontSize',14);
+    % Satuan (%)
+    text(0.5, 0.30, lbl_pet{i}{2}, 'Horiz','center','FontSize',15,'FontWeight','bold');
+    % Skala 0 dan 1
+    text(0.02, 0.1, lbl_pet{i}{3}, 'Horiz','left','FontSize',12,'FontWeight','bold');
+    text(0.98, 0.1, lbl_pet{i}{4}, 'Horiz','right','FontSize',12,'FontWeight','bold');
+    
+    % 2. Menggambar Area Plotting
+    ax_pay(i) = axes('Position', [curr_x, y_track, w_pet, h_track]);
+    set(ax_pay(i), 'FontName', font_name, 'FontSize', axis_size, 'Box', 'on', 'LineWidth', 1.0, ...
+        'TickDir', 'out', 'XColor', 'k', 'YColor', 'k', 'YDir', 'reverse', 'XAxisLocation', 'bottom', ...
+        'XTickLabel', [], 'XGrid', 'on', 'YGrid', 'on', 'GridColor', grid_color, 'GridAlpha', 0.8, ...
+        'XMinorGrid', 'on', 'YMinorGrid', 'on', 'MinorGridColor', grid_color, 'MinorGridAlpha', 0.4);
+    
+    if i == 1
+        ylabel(ax_pay(i), 'Depth (ft)', 'FontWeight', 'bold', 'FontSize', 12);
+    else
+        set(ax_pay(i), 'YTickLabel', []);
+    end
+    
+    hold(ax_pay(i), 'on'); 
+    curr_x = curr_x + w_pet + gap;
+end
+
+% ---------------------------------------------------------
+% Plot Track 1: Vshale
+% ---------------------------------------------------------
+axes(ax_pay(1)); 
+for i = 1:length(DEPT)-1
+    if isnan(Vsh_Final(i)) || isnan(Vsh_Final(i+1)); continue; end
+    patch([Vsh_Final(i) 1 1 Vsh_Final(i)], [DEPT(i) DEPT(i) DEPT(i+1) DEPT(i+1)], [0.85 0.85 0.85], 'FaceAlpha', 1.0, 'EdgeColor', 'none'); 
+end
+plot(Vsh_Final, DEPT, 'Color', [0.4 0.3 0.1], 'LineWidth', 1.5); 
+xline(CO_Vsh, 'r--', 'LineWidth', 1.8); % Cut-off Dinyalakan & Dipertebal
+xlim([0 1]); xticks([0 0.25 0.5 0.75 1]);
+set(ax_pay(1), 'Layer', 'top'); % Menjaga Grid tetap di depan arsiran abu-abu
+
+% ---------------------------------------------------------
+% Plot Track 2: Porosity
+% ---------------------------------------------------------
+axes(ax_pay(2)); 
+plot(phi_eff, DEPT, 'c', 'LineWidth', 1.5);
+xline(CO_Phi, 'r--', 'LineWidth', 1.8); % Cut-off Dinyalakan & Dipertebal
+xlim([0 1]); xticks([0 0.25 0.5 0.75 1]); set(gca, 'XDir', 'normal');
+set(ax_pay(2), 'Layer', 'top');
+
+% ---------------------------------------------------------
+% Plot Track 3: Water Saturation (Figure 3 - Dengan Cut-off)
+% ---------------------------------------------------------
+axes(ax_pay(3)); 
+plot(Sw_Final, DEPT, 'y', 'LineWidth', 1.5);
+
+% MENAMBAHKAN KEMBALI GARIS CUT-OFF SW
+xline(CO_Sw, 'r--', 'LineWidth', 1.8); 
+
+% Label nilai cut-off agar lebih informatif bagi reviewer
+text(CO_Sw + 0.02, Top_Formasi + 50, ['CO Sw: ', num2str(CO_Sw, '%.2f')], ...
+    'Color', 'r', 'FontSize', 10, 'FontWeight', 'bold');
+
+xlim([0 1]); xticks([0 0.25 0.5 0.75 1]);
+set(ax_pay(3), 'Layer', 'top');
+% ---------------------------------------------------------
+% Shading Flag (Edge Banding): Net Reservoir & Net Pay
+% ---------------------------------------------------------
+for i = 1:3
+    axes(ax_pay(i)); hold on; 
+    xl = xlim(); 
+    % Lebar pita diperbesar menjadi 7.5% agar lebih mencolok untuk jurnal
+    strip_w = (xl(2) - xl(1)) * 0.075; 
+    
+    % Hijau (Net Reservoir) di sisi kiri, Merah (Net Pay) di sisi kanan
+    func_draw_patches_fast(ax_pay(i), DEPT, netResFlag, [xl(1), xl(1)+strip_w], [0.0 0.8 0.0], 0.8);
+    func_draw_patches_fast(ax_pay(i), DEPT, netPayFlag, [xl(2)-strip_w, xl(2)], [1.0 0.0 0.0], 0.8);
+end
+
+% ---------------------------------------------------------
+% Link Sumbu Kedalaman & Set Skala
+% ---------------------------------------------------------
+linkaxes(ax_pay,'y'); 
+set(ax_pay(1), 'YLim', [Top_Formasi Base_Formasi]);
+
+% =========================================================================
+% EXPORT FIGURE 3 KE RESOLUSI TINGGI
+% =========================================================================
+exportgraphics(fig_pay, 'Net_Pay_Identification_600DPI.png', 'Resolution', 600);
+fprintf('=> Sukses! Gambar Figure 3 (Net Pay & Cut-off) High-Res telah disimpan.\n');
 %% =========================================================================
 % FUNCTION BLOCKS (WAJIB DI BARIS PALING BAWAH SCRIPT)
 % =========================================================================
@@ -976,9 +1188,9 @@ Nphi_v   = NPHI(:);
 Dt_usft  = DT(:);
 
 % Parameter Hasil Hitungan
-Vshale_v     = Vsh(:);
+Vshale_v     = Vsh_Final(:);
 Porosity_Eff = phi_eff(:);
-Water_Sat    = Sw(:);
+Water_Sat    = Sw_Final(:);
 
 % Flags & Lithology (Diubah jadi angka 1 atau 0 agar mudah difilter di Excel)
 Net_Res_Flag = double(netResFlag(:)); 
@@ -1002,3 +1214,4 @@ fprintf('=> SUKSES! Seluruh data dari kedalaman %g ft - %g ft telah disimpan.\n'
 fprintf('=> Buka Excel Anda, lalu filter kolom "Valid_Data" = 1 untuk menghitung rata-rata.\n');
 fprintf('=> Silakan cek folder MATLAB Anda untuk file: %s\n', nama_file_excel);
 fprintf('==========================================================================================================================\n\n');
+
