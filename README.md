@@ -42,6 +42,7 @@ idx_lls  = []; for a={'LLS', 'RXO', 'ILM', 'RS', 'AHT10', 'RMIC'}, idx=find(strc
 idx_rhob = []; for a={'RHOB', 'ZDEN', 'DEN', 'RHOZ', 'DENB'}, idx=find(strcmpi(curve_names, a{1}),1); if ~isempty(idx), idx_rhob=idx; break; end; end
 idx_nphi = []; for a={'NPHI', 'CNC', 'PHIN', 'NPOR', 'HNPO'}, idx=find(strcmpi(curve_names, a{1}),1); if ~isempty(idx), idx_nphi=idx; break; end; end
 idx_dt   = []; for a={'DT', 'AC', 'DTC', 'DTCO', 'ACCO'}, idx=find(strcmpi(curve_names, a{1}),1); if ~isempty(idx), idx_dt=idx; break; end; end
+idx_cali = []; for a={'CALI', 'CAL', 'HCAL', 'CALS'}, idx=find(strcmpi(curve_names, a{1}),1); if ~isempty(idx), idx_cali=idx; break; end; end
 
 n_rows = length(DEPT);
 if ~isempty(idx_gr),   GR = ascii_data(:, idx_gr);     else, GR = NaN(n_rows, 1);   end
@@ -50,6 +51,7 @@ if ~isempty(idx_lls),  LLS = ascii_data(:, idx_lls);   else, LLS = NaN(n_rows, 1
 if ~isempty(idx_rhob), RHOB = ascii_data(:, idx_rhob); else, RHOB = NaN(n_rows, 1); end
 if ~isempty(idx_nphi), NPHI = ascii_data(:, idx_nphi); else, NPHI = NaN(n_rows, 1); end
 if ~isempty(idx_dt),   DT = ascii_data(:, idx_dt);     else, DT = NaN(n_rows, 1);   end
+if ~isempty(idx_cali), CALI = ascii_data(:, idx_cali); else, CALI = NaN(n_rows, 1); end
 
 dz = median(diff(DEPT), 'omitnan'); 
 if isnan(dz) || dz == 0, error('ANALISIS BERHENTI: Resolusi kedalaman (dz) tidak valid.'); end
@@ -63,7 +65,7 @@ h_header = 0.10; h_track = 0.82; gap = 0.005;
 y_header = margin_bottom + h_track; y_track = margin_bottom;
 font_name = 'Arial'; grid_color = [0.75 0.75 0.75]; axis_size = 9;
 total_width_tc = 1.0 - margin_left - margin_right; w_tc = (total_width_tc - (2 * gap)) / 3; 
-lbl_tc = {{'GAMMA RAY', '(API)', '0', '150'}, {'RESISTIVITY', '(OHM.M)', '0.2', '2000'}, {'RHOB (Red) / NPHI (Blue)', '(G/CC) / (V/V)', '1.7 / 0.6', '2.7 / 0'}};
+lbl_tc = {{'GR (Grn) / CALI (Blk)', '(API) / (INCH)', '0 / 6', '150 / 16'}, {'RESISTIVITY', '(OHM.M)', '0.2', '2000'}, {'RHOB (Red) / NPHI (Blue)', '(G/CC) / (V/V)', '1.7 / 0.6', '2.7 / 0'}};
 
 GR_valid_fw = GR(~isnan(GR) & GR > 0);
 if ~isempty(GR_valid_fw)
@@ -83,8 +85,8 @@ for i = 1:3
     hold(ax_full(i), 'on'); curr_x = curr_x + w_tc + gap;
 end
 
-% Track 1: GR (FULL LOG)
-axes(ax_full(1)); 
+% Track 1: GR & CALI (FULL LOG)
+axes(ax_full(1));
 if ~isempty(GR_valid_fw)
     for i = 1:length(DEPT)-1
         if isnan(GR(i)) || isnan(GR(i+1)); continue; end
@@ -93,7 +95,16 @@ if ~isempty(GR_valid_fw)
     end
 end
 plot(GR, DEPT, 'g', 'LineWidth', 1.2); if ~isempty(GR_valid_fw), xline(GR_cutoff_fw, 'r--', 'LineWidth', 1.5); end
-xlim([0 150]); ylabel('Depth (ft)', 'FontWeight', 'bold', 'FontSize', 11); set(ax_full(1), 'Layer', 'top'); 
+
+% --- PLOT CALIPER (SKALA 6-16 INCH DIKONVERSI KE 0-150) ---
+CALI_scaled = (CALI - 6) .* (150 / (16 - 6));
+BitSize_scaled = (8.5 - 6) * (150 / (16 - 6)); % Asumsi Bit Size = 8.5 inch
+plot(CALI_scaled, DEPT, 'k-', 'LineWidth', 1.5); % Garis Caliper Hitam
+xline(BitSize_scaled, 'k--', 'LineWidth', 1.5); % Garis Putus-putus Bit Size
+% ----------------------------------------------------------
+
+xlim([0 150]); ylabel('Depth (ft)', 'FontWeight', 'bold', 'FontSize', 11);
+set(ax_full(1), 'Layer', 'top');
 
 % Track 2: Resistivity (FULL LOG)
 axes(ax_full(2)); LLD_plot = LLD; LLS_plot = LLS; LLD_plot(LLD_plot<=0)=NaN; LLS_plot(LLS_plot<=0)=NaN; 
@@ -152,8 +163,8 @@ for i = 1:3
     hold(ax_tc(i), 'on'); curr_x = curr_x + w_tc + gap;
 end
 
-% Track 1: GR (ZONA PROSPEK)
-axes(ax_tc(1)); 
+% Track 1: GR & CALI (ZONA PROSPEK)
+axes(ax_tc(1));
 if ~isempty(GR_valid_fw)
     for i = 1:length(DEPT)-1
         if isnan(GR(i)) || isnan(GR(i+1)); continue; end
@@ -162,7 +173,24 @@ if ~isempty(GR_valid_fw)
     end
 end
 plot(GR, DEPT, 'g', 'LineWidth', 1.5); if ~isempty(GR_valid_fw), xline(GR_cutoff_fw, 'r--', 'LineWidth', 1.3); end
-xlim([0 150]); xticks([0 50 100 150]); ylabel('Depth (ft)', 'FontWeight', 'bold', 'FontSize', 11); set(ax_tc(1), 'Layer', 'top'); 
+
+% --- PLOT CALIPER & SHADING WASHOUT ---
+CALI_scaled = (CALI - 6) .* (150 / (16 - 6));
+BitSize_scaled = (8.5 - 6) * (150 / (16 - 6)); % Asumsi Bit Size = 8.5 inch
+
+% Memberikan arsiran merah (shading) jika Caliper membesar drastis (> Bit Size)
+for i = 1:length(DEPT)-1
+    if isnan(CALI_scaled(i)) || isnan(CALI_scaled(i+1)); continue; end
+    if CALI_scaled(i) > BitSize_scaled
+        patch([BitSize_scaled CALI_scaled(i) CALI_scaled(i) BitSize_scaled], [DEPT(i) DEPT(i) DEPT(i+1) DEPT(i+1)], [1 0 0], 'FaceAlpha', 0.3, 'EdgeColor', 'none');
+    end
+end
+plot(CALI_scaled, DEPT, 'k-', 'LineWidth', 2.0); % Garis Caliper Hitam Tebal
+xline(BitSize_scaled, 'k--', 'LineWidth', 2.0); % Garis Putus-putus Bit Sizea
+% --------------------------------------
+
+xlim([0 150]); xticks([0 50 100 150]);
+ylabel('Depth (ft)', 'FontWeight', 'bold', 'FontSize', 11); set(ax_tc(1), 'Layer', 'top');
 
 % Track 2: Resistivity (ZONA PROSPEK)
 axes(ax_tc(2)); LLD_plot = LLD; LLS_plot = LLS; LLD_plot(LLD_plot<=0)=NaN; LLS_plot(LLS_plot<=0)=NaN; 
