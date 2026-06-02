@@ -65,7 +65,7 @@ h_header = 0.10; h_track = 0.82; gap = 0.005;
 y_header = margin_bottom + h_track; y_track = margin_bottom;
 font_name = 'Arial'; grid_color = [0.75 0.75 0.75]; axis_size = 9;
 total_width_tc = 1.0 - margin_left - margin_right; w_tc = (total_width_tc - (2 * gap)) / 3; 
-lbl_tc = {{'GR (Green) / CALI (Black)', '(API) / (INCH)', '0 / 6', '150 / 16'}, {'RESISTIVITY', '(OHM.M)', '0.2', '2000'}, {'RHOB (Red) / NPHI (Blue)', '(G/CC) / (V/V)', '1.7 / 0.6', '2.7 / 0'}};
+lbl_tc = {{'GR (Grn) / CALI (Blk)', '(API) / (INCH)', '0 / 6', '150 / 16'}, {'RESISTIVITY', '(OHM.M)', '0.2', '2000'}, {'RHOB (Red) / NPHI (Blue)', '(G/CC) / (V/V)', '1.7 / 0.6', '2.7 / 0'}};
 
 GR_valid_fw = GR(~isnan(GR) & GR > 0);
 if ~isempty(GR_valid_fw)
@@ -659,46 +659,39 @@ phi_form = phi_eff(zone);
 sw_form  = Sw(zone);
 
 % --- 6.3 VISUALISASI CUT-OFF STATISTIK ---
-Title_FS = 20; Label_FS = 16;
-Tick_FS  = 14; Text_FS  = 15;
+Title_FS = 20; Label_FS = 16; Tick_FS  = 14; Text_FS  = 15;
 fig_cutoff = figure('Name', 'Analisis Cut-Off Statistik', 'Color', 'w', 'Position', [50 100 1600 550], 'NumberTitle', 'off');
 
 % Subplot 1: Histogram Porositas
 subplot(1,3,1);
-histogram(phi_form(vsh_form <= CO_Vsh), 30, 'FaceColor', [0.2 0.6 0.8], 'EdgeColor', 'k', 'LineWidth', 1.2); hold on;
-grid on;
-xline(CO_Phi, 'k--', 'LineWidth', 5.0); % <-- Diubah menjadi hitam putus-putus ('k--')
+histogram(phi_form(vsh_form <= CO_Vsh), 30, 'FaceColor', [0.2 0.6 0.8], 'EdgeColor', 'k', 'LineWidth', 1.2); hold on; grid on;
+xline(CO_Phi, 'r-', 'LineWidth', 3.5);
 title('Histogram PHIE', 'FontWeight', 'bold', 'FontSize', Title_FS);
-xlabel('Effective Porosity (PHIE)', 'FontWeight', 'bold', 'FontSize', Label_FS);
-ylabel('Frekuensi', 'FontWeight', 'bold', 'FontSize', Label_FS);
+xlabel('Effective Porosity (PHIE)', 'FontWeight', 'bold', 'FontSize', Label_FS); ylabel('Frekuensi', 'FontWeight', 'bold', 'FontSize', Label_FS);
 xlim([0 max(0.4, max(phi_form)+0.05)]);
-text(CO_Phi + 0.015, max(ylim)*0.50, sprintf('PHIE \\geq %.3f', CO_Phi), 'Color', 'k', 'FontWeight', 'bold', 'FontSize', Text_FS, 'BackgroundColor', 'w', 'EdgeColor', 'k', 'LineWidth', 1.5, 'Margin', 3); % <-- Teks dan bingkai diubah menjadi hitam ('k')
+text(CO_Phi + 0.015, max(ylim)*0.50, sprintf('PHIE \\geq %.3f', CO_Phi), 'Color', 'r', 'FontWeight', 'bold', 'FontSize', Text_FS, 'BackgroundColor', 'w', 'Margin', 2);
 set(gca, 'FontSize', Tick_FS, 'LineWidth', 1.5, 'FontWeight', 'bold', 'GridLineStyle', ':', 'GridAlpha', 0.6);
 
 % Subplot 2: Crossplot VSH vs PHIE
 subplot(1,3,2);
 scatter(vsh_form, phi_form, 45, DEPT(zone), 'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 0.5, 'MarkerFaceAlpha', 0.8); colormap(jet); hold on; grid on;
-xline(CO_Vsh, 'k--', 'LineWidth', 5.0); % <-- Diubah menjadi hitam putus-putus ('k--')
-yline(CO_Phi, 'k--', 'LineWidth', 5.0); % <-- Diubah menjadi hitam putus-putus ('k--')
+xline(CO_Vsh, 'r-', 'LineWidth', 3.5); yline(CO_Phi, 'r-', 'LineWidth', 3.5);
 title('Crossplot VSH vs PHIE', 'FontWeight', 'bold', 'FontSize', Title_FS);
-xlabel('Volume Shale (VSH)', 'FontWeight', 'bold', 'FontSize', Label_FS);
-ylabel('Effective Porosity (PHIE)', 'FontWeight', 'bold', 'FontSize', Label_FS);
+xlabel('Volume Shale (VSH)', 'FontWeight', 'bold', 'FontSize', Label_FS); ylabel('Effective Porosity (PHIE)', 'FontWeight', 'bold', 'FontSize', Label_FS);
 xlim([0 1.0]); ylim([0 max(0.4, max(phi_form)+0.05)]);
-text(CO_Vsh + 0.03, max(ylim)*0.50, sprintf('VSH \\leq %.2f', CO_Vsh), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'k', 'BackgroundColor', 'w', 'EdgeColor', 'k', 'LineWidth', 1.5, 'Margin', 3);
-text(max(xlim)*0.70, CO_Phi + 0.02, sprintf('PHIE \\geq %.3f', CO_Phi), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'k', 'BackgroundColor', 'w', 'EdgeColor', 'k', 'LineWidth', 1.5, 'Margin', 3, 'HorizontalAlignment', 'center');
+text(CO_Vsh + 0.03, max(ylim)*0.50, sprintf('VSH \\leq %.2f', CO_Vsh), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'r', 'BackgroundColor', 'w', 'Margin', 2);
+text(max(xlim)*0.70, CO_Phi + 0.02, sprintf('PHIE \\geq %.3f', CO_Phi), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'r', 'BackgroundColor', 'w', 'Margin', 2, 'HorizontalAlignment', 'center');
 set(gca, 'FontSize', Tick_FS, 'LineWidth', 1.5, 'FontWeight', 'bold', 'GridLineStyle', ':', 'GridAlpha', 0.6);
 
 % Subplot 3: Crossplot PHIE vs SW
 subplot(1,3,3);
 scatter(phi_form, sw_form, 45, DEPT(zone), 'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 0.5, 'MarkerFaceAlpha', 0.8); hold on; grid on;
-xline(CO_Phi, 'k--', 'LineWidth', 5.0); % <-- Diubah menjadi hitam putus-putus ('k--')
-yline(CO_Sw, 'k--', 'LineWidth', 5.0);  % <-- Diubah menjadi hitam putus-putus ('k--')
+xline(CO_Phi, 'r-', 'LineWidth', 3.5); yline(CO_Sw, 'r-', 'LineWidth', 3.5); 
 title('Crossplot PHIE vs SW', 'FontWeight', 'bold', 'FontSize', Title_FS);
-xlabel('Effective Porosity (PHIE)', 'FontWeight', 'bold', 'FontSize', Label_FS);
-ylabel('Water Saturation (SW)', 'FontWeight', 'bold', 'FontSize', Label_FS);
+xlabel('Effective Porosity (PHIE)', 'FontWeight', 'bold', 'FontSize', Label_FS); ylabel('Water Saturation (SW)', 'FontWeight', 'bold', 'FontSize', Label_FS);
 xlim([0 max(0.4, max(phi_form)+0.05)]); ylim([0 1.0]);
-text(CO_Phi + 0.02, 0.85, sprintf('PHIE \\geq %.3f', CO_Phi), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'k', 'BackgroundColor', 'w', 'EdgeColor', 'k', 'LineWidth', 1.5, 'Margin', 3);
-text(max(xlim)*0.70, CO_Sw + 0.04, sprintf('SW \\leq %.2f', CO_Sw), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'k', 'BackgroundColor', 'w', 'EdgeColor', 'k', 'LineWidth', 1.5, 'Margin', 3, 'HorizontalAlignment', 'center');
+text(CO_Phi + 0.02, 0.85, sprintf('PHIE \\geq %.3f', CO_Phi), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'r', 'BackgroundColor', 'w', 'Margin', 2);
+text(max(xlim)*0.70, CO_Sw + 0.04, sprintf('SW \\leq %.2f', CO_Sw), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'r', 'BackgroundColor', 'w', 'Margin', 2, 'HorizontalAlignment', 'center');
 set(gca, 'FontSize', Tick_FS, 'LineWidth', 1.5, 'FontWeight', 'bold', 'GridLineStyle', ':', 'GridAlpha', 0.6);
 exportgraphics(fig_cutoff, 'Analisis_Cutoff_Manual_600DPI.png', 'Resolution', 600);
 
