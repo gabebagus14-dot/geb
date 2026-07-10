@@ -1,12 +1,11 @@
-%% ========================================================================
-%                          PETROPHYSICAL ANALYSIS 
-%                    TUGAS AKHIR GABE BAGUS ARTHANTHA
-% =========================================================================
-clc; clear; close all;
+%% ANALISIS PETROFISIKA
+% Tugas Akhir: Analisis Komprehensif Data Well Logging dan Parameter Petrofisik untuk Karakterisasi Formasi Reservoir Menggunakan MATLAB pada Lapangan X Sumur Y
+% Oleh       : Gabe Bagus Arthantha (122480062)
+% Rekayasa Minyak dan Gas, Institut Teknologi Sumatera
 
-%% ========================================================================
-%   1. INPUT DATA LOG & QUALITY CONTROL (QC)
-% =========================================================================
+
+clc; clear; close all;
+%% 1. Input Data Log dan Quality Control (QC)
 [file, path] = uigetfile('*.las', 'Pilih File Data LAS');
 if isequal(file,0), error('ANALISIS BERHENTI: Tidak ada file yang dipilih.'); end
 filename = fullfile(path, file);
@@ -56,10 +55,7 @@ if ~isempty(idx_cali), CALI = ascii_data(:, idx_cali); else, CALI = NaN(n_rows, 
 dz = median(diff(DEPT), 'omitnan'); 
 if isnan(dz) || dz == 0, error('ANALISIS BERHENTI: Resolusi kedalaman (dz) tidak valid.'); end
 
-%% ========================================================================
-%   2. FULL WELL TRIPLE COMBO LOG
-% =========================================================================
-
+%% 2. Visualisasi Triple Combo Log (Full Well)
 margin_left = 0.08; margin_right = 0.05; margin_bottom = 0.05; 
 h_header = 0.10; h_track = 0.82; gap = 0.005;
 y_header = margin_bottom + h_track; y_track = margin_bottom;
@@ -86,7 +82,7 @@ for i = 1:3
     hold(ax_full(i), 'on'); curr_x = curr_x + w_tc + gap;
 end
 
-% Track 1: GR & CALI (FULL LOG)
+% Track 1: GR & CALI
 axes(ax_full(1));
 if ~isempty(GR_valid_fw)
     for i = 1:length(DEPT)-1
@@ -96,19 +92,20 @@ if ~isempty(GR_valid_fw)
     end
 end
 plot(GR, DEPT, 'g', 'LineWidth', 1.2); if ~isempty(GR_valid_fw), xline(GR_cutoff_fw, 'r--', 'LineWidth', 1.5); end
-% --- PLOT CALIPER ---
+% CALIPER
 CALI_scaled = (CALI - 4) .* (150 / (14 - 4));
-BitSize_scaled = (6.0 - 4) * (150 / (14 - 4)); % Bit Size aktual = 6.0 inch
-plot(CALI_scaled, DEPT, 'k-', 'LineWidth', 1.5); % Garis Caliper Hitam
-xline(BitSize_scaled, 'k--', 'LineWidth', 1.5); % Garis Putus-putus Bit Size
-% ----------------------------------------------------------
+BitSize_scaled = (6.0 - 4) * (150 / (14 - 4));
+plot(CALI_scaled, DEPT, 'k-', 'LineWidth', 1.5); 
+xline(BitSize_scaled, 'k--', 'LineWidth', 1.5); 
 xlim([0 150]); ylabel('Depth (ft)', 'FontWeight', 'bold', 'FontSize', 11);
 set(ax_full(1), 'Layer', 'top');
-% Track 2: Resistivity (FULL LOG)
+
+% Track 2: Resistivity
 axes(ax_full(2)); LLD_plot = LLD; LLS_plot = LLS; LLD_plot(LLD_plot<=0)=NaN; LLS_plot(LLS_plot<=0)=NaN; 
 semilogx(LLD_plot, DEPT, 'r', 'LineWidth', 1.2); semilogx(LLS_plot, DEPT, 'm', 'LineWidth', 0.8); 
 set(gca,'XScale','log'); xlim([0.2 2000]); set(gca,'YTickLabel',[]);
-% Track 3: Density-Neutron (FULL LOG)
+
+% Track 3: Density-Neutron
 axes(ax_full(3)); NPHI_scaled = 2.7 - (NPHI .* (1.0/0.6)); separation = NPHI_scaled - RHOB;
 for i = 1:length(DEPT)-1
     if isnan(RHOB(i)) || isnan(NPHI_scaled(i)); continue; end
@@ -120,9 +117,7 @@ xlim([1.7 2.7]); set(gca,'YTickLabel',[]); set(ax_full(3), 'Layer', 'top');
 linkaxes(ax_full,'y'); set(ax_full(1), 'YLim', [min(DEPT) max(DEPT)]); 
 exportgraphics(fig_full, '0_Full_Well_Triple_Combo_600DPI.png', 'Resolution', 600);
 
-%% ========================================================================
-%   3. INPUT ZONA TARGET & VISUALISASI TRIPLE COMBO ZONA PROSPEK
-% =========================================================================
+%% 3. Penentuan Zona Target dan Visualisasi Prospek
 pause(2); 
 
 prompt_zona = {
@@ -159,7 +154,7 @@ for i = 1:3
     hold(ax_tc(i), 'on'); curr_x = curr_x + w_tc + gap;
 end
 
-% Track 1: GR & CALI (ZONA PROSPEK)
+% Track 1: GR & CALI 
 axes(ax_tc(1));
 if ~isempty(GR_valid_fw)
     for i = 1:length(DEPT)-1
@@ -170,9 +165,9 @@ if ~isempty(GR_valid_fw)
 end
 plot(GR, DEPT, 'g', 'LineWidth', 1.5); if ~isempty(GR_valid_fw), xline(GR_cutoff_fw, 'r--', 'LineWidth', 1.3); end
 
-% --- PLOT CALIPER & SHADING WASHOUT ---
+% PLOT CALIPER 
 CALI_scaled = (CALI - 4) .* (150 / (14 - 4));
-BitSize_scaled = (6.0 - 4) * (150 / (14 - 4)); % Bit Size = 6.0 inch
+BitSize_scaled = (6.0 - 4) * (150 / (14 - 4));
 
 for i = 1:length(DEPT)-1
     if isnan(CALI_scaled(i)) || isnan(CALI_scaled(i+1)); continue; end
@@ -180,19 +175,18 @@ for i = 1:length(DEPT)-1
         patch([BitSize_scaled CALI_scaled(i) CALI_scaled(i) BitSize_scaled], [DEPT(i) DEPT(i) DEPT(i+1) DEPT(i+1)], [1 0 0], 'FaceAlpha', 0.3, 'EdgeColor', 'none');
     end
 end
-plot(CALI_scaled, DEPT, 'k-', 'LineWidth', 2.0); % Garis Caliper Hitam Tebal
-xline(BitSize_scaled, 'k--', 'LineWidth', 2.0); % Garis Putus-putus Bit Size 6 inch
-% --------------------------------------
+plot(CALI_scaled, DEPT, 'k-', 'LineWidth', 2.0); 
+xline(BitSize_scaled, 'k--', 'LineWidth', 2.0);
 
 xlim([0 150]); xticks([0 50 100 150]);
 ylabel('Depth (ft)', 'FontWeight', 'bold', 'FontSize', 11); set(ax_tc(1), 'Layer', 'top');
 
-% Track 2: Resistivity (ZONA PROSPEK)
+% Track 2: Resistivity 
 axes(ax_tc(2)); LLD_plot = LLD; LLS_plot = LLS; LLD_plot(LLD_plot<=0)=NaN; LLS_plot(LLS_plot<=0)=NaN; 
 semilogx(LLD_plot, DEPT, 'r', 'LineWidth', 1.5); semilogx(LLS_plot, DEPT, 'm', 'LineWidth', 1.0); 
 set(gca,'XScale','log'); xlim([0.2 2000]); xticks([0.2 1 10 100 1000 2000]); set(gca,'YTickLabel',[]);
 
-% Track 3: Density-Neutron (ZONA PROSPEK)
+% Track 3: Density-Neutron 
 axes(ax_tc(3)); NPHI_scaled = 2.7 - (NPHI .* (1.0/0.6)); separation = NPHI_scaled - RHOB;
 for i = 1:length(DEPT)-1
     if isnan(RHOB(i)) || isnan(NPHI_scaled(i)); continue; end
@@ -205,9 +199,7 @@ xlim([1.7 2.7]); xticks([1.7 1.95 2.2 2.45 2.7]); set(gca,'YTickLabel',[]); set(
 linkaxes(ax_tc,'y'); set(ax_tc(1), 'YLim', [Top_Formasi Base_Formasi]); 
 exportgraphics(fig_tc, '1_Triple_Combo_Target_600DPI.png', 'Resolution', 600);
 
-%% ========================================================================
-%   4. IDENTIFIKASI LITOLOGI (INPUT 3 ZONA & VISUALISASI CROSSPLOT)
-% =========================================================================
+%% 4. Identifikasi Litologi menggunakan Crossplot
 prompt_lit = {
     'Zona 1 Top (ft) [Wajib Diisi]:', ...
     'Zona 1 Base (ft) [Wajib Diisi]:', ...
@@ -236,9 +228,7 @@ ZoneColors = [
 idx_formasi = (DEPT >= Top_Formasi & DEPT <= Base_Formasi & valid_log);
 Title_FS = 22; Label_FS = 18; Tick_FS  = 14; Text_FS  = 14;   
 
-% -------------------------------------------------------------------------
-% 4.1 DENSITY-NEUTRON CROSSPLOT
-% -------------------------------------------------------------------------
+%% 4.1. Density-Neutron Crossplot
 fig_dn = figure('Name','Density-Neutron Crossplot','Color','w','Position',[100 50 1000 950]);
 hold on; box on; xlim([-0.05 0.45]); ylim([1.9 3.0]);
 set(gca, 'XDir', 'normal', 'YDir', 'reverse', 'FontSize', Tick_FS, 'LineWidth', 2.0, 'FontWeight', 'bold'); 
@@ -284,9 +274,7 @@ plot(-0.01, 2.98, 'ko', 'MarkerFaceColor','w', 'LineWidth',2.0, 'MarkerSize',10)
 plot(1.0, 1.0, 'bo', 'MarkerFaceColor','b', 'MarkerSize',10); text(0.40, 1.95, '\rho_f = 1.0 g/cc', 'FontSize',Text_FS, 'FontWeight','bold', 'Color','b'); hold off;
 exportgraphics(fig_dn, '1_Density_Neutron_Crossplot_600DPI.png', 'Resolution', 600);
 
-% -------------------------------------------------------------------------
-% 4.2 MATRIX IDENTIFICATION PLOT (MID PLOT)
-% -------------------------------------------------------------------------
+%% 4.2. Matrix Identification Plot (MID Plot)
 fig_mid = figure('Name','MID Plot','Color','w','Position',[50 50 1100 1000]); 
 axMain = axes('Position', [0.12 0.12 0.82 0.78]); hold(axMain, 'on'); box(axMain, 'on');
 xlim(axMain, [35 75]); ylim(axMain, [2.4 3.1]); 
@@ -321,9 +309,7 @@ title(axMain, 'Matrix Identification Plot (MID)', 'FontWeight','bold', 'FontSize
 legend(axMain, legend_names, 'Location','southwest', 'FontSize', Text_FS, 'FontWeight','bold'); hold(axMain, 'off');
 exportgraphics(fig_mid, '2_MID_Plot_600DPI.png', 'Resolution', 600);
 
-% -------------------------------------------------------------------------
-% 4.3 SONIC–DENSITY CROSSPLOT 
-% -------------------------------------------------------------------------
+%% 4.3. Sonic-Density Crossplot
 fig_sd = figure('Name','Sonic-Density Crossplot','Color','w','Position',[50 50 1100 1000]); hold on; box on;
 set(gca, 'XLim', [40 120], 'YLim', [1.9 3.0], 'YDir', 'reverse', 'FontSize', Tick_FS, 'LineWidth', 2.0, 'FontWeight', 'bold');
 set(gca, 'XTick', 40:10:120); set(gca, 'YTick', 1.90:0.1:3.00); set(gca, 'XMinorTick', 'on', 'YMinorTick', 'on');
@@ -367,9 +353,7 @@ h1 = plot(nan,nan, 'k-', 'LineWidth',3.0); h2 = plot(nan,nan, 'r-', 'LineWidth',
 legend([h1 h2 h_zones_sd(1)], {'Empirical (Raymer-5.Hunt-Gardner)', 'Time Average (Wyllie)', 'Zona Potensi'}, 'Location', 'northeast', 'FontSize',Text_FS, 'FontWeight','bold'); hold off;
 exportgraphics(fig_sd, '3_Sonic_Density_Crossplot_600DPI.png', 'Resolution', 600);
 
-% -------------------------------------------------------------------------
-% 4.4 NEUTRON-SONIC CROSSPLOT 
-% -------------------------------------------------------------------------
+%% 4.4. Neutron-Sonic Crossplot
 fig_ns = figure('Name','Neutron-Sonic Crossplot','Color','w','Position',[50 20 1100 1100]); 
 ax = axes('Position',[0.12 0.1 0.8 0.8]); hold on; box on; set(ax, 'XTick', [], 'YTick', []); 
 title('Neutron-Sonic Crossplot', 'FontWeight','bold', 'FontSize',Title_FS);
@@ -401,9 +385,7 @@ for i = 1:size(Zona_Kualitatif, 1)
 end
 hold off; exportgraphics(fig_ns, '4_Neutron_Sonic_Crossplot_600DPI.png', 'Resolution', 600);
 
-% -------------------------------------------------------------------------
-% 4.5 TABEL KESIMPULAN LITOLOGI
-% -------------------------------------------------------------------------
+%% 4.5. Tabel Kesimpulan Litologi
 calc_rho_from_dt = @(dt_log, rho_m, dt_m) (1 - (0.625 * (1 - dt_m./dt_log))) * rho_m + (0.625 * (1 - dt_m./dt_log)) * 1.0;
 fprintf('\n==========================================================================================================================\n');
 fprintf('                              COMPARISON OF LITHOLOGY ESTIMATION FROM VARIOUS CROSSPLOTS\n');
@@ -446,9 +428,8 @@ for i = 1:size(Zona_Kualitatif, 1)
 end
 fprintf('==========================================================================================================================\n');
 
-%% ========================================================================
-%   5. PERHITUNGAN PETROFISIKA INTI, PICKETT PLOT & STATISTIK CUT-OFF
-% =========================================================================
+
+%% 5. Perhitungan Petrofisika, Pickett Plot, dan  Cut-Off
 pause(2); 
 prompt_petro = {
     'Densitas Matriks (rho_ma) [Sandstone = 2.65, Limestone = 2.71, Dolomite = 2.87]:', ...
@@ -471,7 +452,7 @@ n = str2double(ans_petro{5});
 z_top_water = str2double(ans_petro{6});
 z_bot_water = str2double(ans_petro{7});
 
-% --- PERHITUNGAN BASELINE & VSHALE ---
+% PERHITUNGAN VSHALE
 GR_valid_all = GR(~isnan(GR));
 if ~isempty(GR_valid_all)
     GR_shale_cutoff = prctile(GR_valid_all, 95);
@@ -492,10 +473,9 @@ GR_valid = GR(~isnan(GR) & GR > 0);
 GR_clean = prctile(GR_valid, 5); 
 GR_shale = prctile(GR_valid, 95); 
 Vsh = (GR - GR_clean) ./ (GR_shale - GR_clean); 
-% SAFETY CLAMP 
 Vsh(Vsh < 0) = 0; Vsh(Vsh > 1) = 1; 
 
-% --- PERHITUNGAN POROSITAS EFEKTIF ---
+% PERHITUNGAN POROSITAS EFEKTIF
 phi_D = (rho_ma - RHOB) ./ (rho_ma - rho_f); 
 phi_Dsh = (rho_ma - rho_sh) ./ (rho_ma - rho_f);
 fprintf('\n========================================================\n');
@@ -510,10 +490,9 @@ fprintf('========================================================\n\n');
 phi_Dc = phi_D - (Vsh .* phi_Dsh); 
 phi_Nc = NPHI - (Vsh .* phi_Nsh); 
 phi_eff = sqrt((phi_Nc.^2 + phi_Dc.^2) ./ 2);
-% SAFETY CLAMP
 phi_eff(phi_eff < 0) = 0; phi_eff(phi_eff > 1) = 1; 
 
-% --- PERHITUNGAN WATER SATURATION & Rw ---
+% PERHITUNGAN WATER SATURATION & Rw
 idx_water = (DEPT >= z_top_water) & (DEPT <= z_bot_water) & ~isnan(LLD) & ~isnan(phi_eff);
 Rwa_water_zone = (LLD(idx_water) .* (phi_eff(idx_water).^m)) ./ a;
 Rw = median(Rwa_water_zone, 'omitnan');
@@ -522,10 +501,9 @@ if isnan(Rw)
 end
 fprintf('=> Nilai Rw : %.6f ohm.m\n', Rw);
 Sw = ( (a .* Rw) ./ ((phi_eff.^m) .* LLD) ) .^ (1/n);
-% SAFETY CLAMP
 Sw(Sw < 0) = 0; Sw(Sw > 1) = 1; 
 
-% --- VISUALISASI PICKETT PLOT ---
+% VISUALISASI PICKETT PLOT
 fig_pickett = figure('Name', 'Pickett Plot - Final Validation', 'Color', 'w', 'Position', [200 200 900 800]);
 h_all = loglog(LLD(zone), phi_eff(zone), 'o', 'MarkerSize', 5, 'MarkerFaceColor', [0.7 0.7 0.7], 'MarkerEdgeColor', 'none'); 
 hold on; box on; 
@@ -559,7 +537,7 @@ end
 hold off;
 exportgraphics(fig_pickett, '1_Pickett_Plot_600DPI.png', 'Resolution', 600);
 
-% --- INPUT CUT-OFF & FLAG IDENTIFICATION ---
+% INPUT CUT-OFF 
 pause(2); 
 prompt_co = {
     'Cut-off Volume Shale (CO_Vsh) [%, misal: 0.37]:', ...
@@ -574,7 +552,6 @@ CO_Vsh = str2double(ans_co{1});
 CO_Phi = str2double(ans_co{2});
 CO_Sw  = str2double(ans_co{3});
 
-% LOGICAL SHADING FLAGS
 netResFlag = (Vsh <= CO_Vsh) & (phi_eff >= CO_Phi) & valid_log;
 netPayFlag = netResFlag & (Sw <= CO_Sw) & valid_log;
 netResFlag(isnan(Vsh) | isnan(phi_eff)) = 0;
@@ -584,21 +561,44 @@ vsh_form = Vsh(zone);
 phi_form = phi_eff(zone); 
 sw_form  = Sw(zone);
 
-% --- VISUALISASI ANALISIS CUT-OFF STATISTIK ---
+% VISUALISASI ANALISIS CUT-OFF 
 Title_FS = 20; Label_FS = 16; Tick_FS  = 14; Text_FS  = 15;
 fig_cutoff = figure('Name', 'Analisis Cut-Off Statistik', 'Color', 'w', 'Position', [50 100 1600 550], 'NumberTitle', 'off');
 
-% Subplot 1: Histogram Porositas
+% Histogram Porositas (Gross Interval)
 subplot(1,3,1);
-histogram(phi_form(vsh_form <= CO_Vsh), 30, 'FaceColor', [0.2 0.6 0.8], 'EdgeColor', 'k', 'LineWidth', 1.2); hold on; grid on;
-xline(CO_Phi, 'k--', 'LineWidth', 5.0); 
-title('Histogram PHIE', 'FontWeight', 'bold', 'FontSize', Title_FS);
-xlabel('Effective Porosity (PHIE)', 'FontWeight', 'bold', 'FontSize', Label_FS); ylabel('Frekuensi', 'FontWeight', 'bold', 'FontSize', Label_FS);
-xlim([0 max(0.4, max(phi_form)+0.05)]);
-text(CO_Phi + 0.015, max(ylim)*0.50, sprintf('PHIE \\geq %.3f', CO_Phi), 'Color', 'k', 'FontWeight', 'bold', 'FontSize', Text_FS, 'BackgroundColor', 'w', 'EdgeColor', 'k', 'LineWidth', 1.5, 'Margin', 3);
-set(gca, 'FontSize', Tick_FS, 'LineWidth', 1.5, 'FontWeight', 'bold', 'GridLineStyle', ':', 'GridAlpha', 0.6);
+histogram(phi_form(~isnan(phi_form)),30,...
+          'FaceColor',[0.2 0.6 0.8],...
+          'EdgeColor','k',...
+          'LineWidth',1.2);
+hold on
+grid on
 
-% Subplot 2: Crossplot VSH vs PHIE
+xline(CO_Phi,'k--','LineWidth',5);
+
+title('Histogram PHIE','FontWeight','bold','FontSize',Title_FS);
+xlabel('Effective Porosity (PHIE)','FontWeight','bold','FontSize',Label_FS);
+ylabel('Frequency','FontWeight','bold','FontSize',Label_FS);
+
+xlim([0 max(0.4,max(phi_form)+0.05)])
+
+text(CO_Phi+0.015,max(ylim)*0.50,...
+    sprintf('PHIE \\geq %.3f',CO_Phi),...
+    'Color','k',...
+    'FontWeight','bold',...
+    'FontSize',Text_FS,...
+    'BackgroundColor','w',...
+    'EdgeColor','k',...
+    'LineWidth',1.5,...
+    'Margin',3);
+
+set(gca,'FontSize',Tick_FS,...
+        'LineWidth',1.5,...
+        'FontWeight','bold',...
+        'GridLineStyle',':',...
+        'GridAlpha',0.6);
+
+% Crossplot VSH vs PHIE
 subplot(1,3,2);
 scatter(vsh_form, phi_form, 45, DEPT(zone), 'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 0.5, 'MarkerFaceAlpha', 0.8); colormap(jet); hold on; grid on;
 xline(CO_Vsh, 'k--', 'LineWidth', 5.0); yline(CO_Phi, 'k--', 'LineWidth', 5.0); 
@@ -609,7 +609,7 @@ text(CO_Vsh + 0.03, max(ylim)*0.50, sprintf('VSH \\leq %.2f', CO_Vsh), 'FontWeig
 text(max(xlim)*0.70, CO_Phi + 0.02, sprintf('PHIE \\geq %.3f', CO_Phi), 'FontWeight', 'bold', 'FontSize', Text_FS, 'Color', 'k', 'BackgroundColor', 'w', 'EdgeColor', 'k', 'LineWidth', 1.5, 'Margin', 3, 'HorizontalAlignment', 'center');
 set(gca, 'FontSize', Tick_FS, 'LineWidth', 1.5, 'FontWeight', 'bold', 'GridLineStyle', ':', 'GridAlpha', 0.6);
 
-% Subplot 3: Crossplot PHIE vs SW
+% Crossplot PHIE vs SW
 subplot(1,3,3);
 scatter(phi_form, sw_form, 45, DEPT(zone), 'filled', 'MarkerEdgeColor', 'k', 'LineWidth', 0.5, 'MarkerFaceAlpha', 0.8); hold on; grid on;
 xline(CO_Phi, 'k--', 'LineWidth', 5.0); yline(CO_Sw, 'k--', 'LineWidth', 5.0);  
@@ -621,15 +621,14 @@ text(max(xlim)*0.70, CO_Sw + 0.04, sprintf('SW \\leq %.2f', CO_Sw), 'FontWeight'
 set(gca, 'FontSize', Tick_FS, 'LineWidth', 1.5, 'FontWeight', 'bold', 'GridLineStyle', ':', 'GridAlpha', 0.6);
 exportgraphics(fig_cutoff, '2_Analisis_Cutoff_Statistik_600DPI.png', 'Resolution', 600);
 
-%% ========================================================================
-%   6. PLOT DISTRIBUSI PETROFISIKA (TANPA FLAG WARNA)
-% =========================================================================
+%% 6. Plot Distribusi Petrofisika 
 fig_petro = figure('Name','Distribusi Petrofisika (Mentah)','Color','w','Position',[100 100 1000 850], 'NumberTitle','off');
 margin_left = 0.08; margin_right = 0.05; margin_bottom = 0.05; 
 h_header = 0.12; h_track = 0.82; gap = 0.005; y_header = margin_bottom + h_track; y_track = margin_bottom;
 font_name = 'Arial'; grid_color = [0.75 0.75 0.75]; axis_size = 9;
 total_width_petro = 1.0 - margin_left - margin_right; w_pet = (total_width_petro - (2 * gap)) / 3;
-lbl_pet = {{'VSHALE', '(%)', '0', '1'}, {'EFFECTIVE POROSITY', '(%)', '0', '1'}, {'WATER SATURATION', '(%)', '0', '1'}};
+
+lbl_pet = {{'Volume Shale', '(v/v)', '0', '1'}, {'Effective Porosity', '(v/v)', '0', '1'}, {'Water Saturation', '(v/v)', '0', '1'}};
 
 ax_pet = gobjects(1, 3); curr_x = margin_left;
 for i = 1:3
@@ -643,7 +642,6 @@ for i = 1:3
     if i == 1, ylabel(ax_pet(i), 'Depth (ft)', 'FontWeight', 'bold', 'FontSize', 11); else, set(ax_pet(i), 'YTickLabel', []); end
     hold(ax_pet(i), 'on'); curr_x = curr_x + w_pet + gap;
 end
-
 % Track Vshale
 axes(ax_pet(1)); 
 for i = 1:length(DEPT)-1
@@ -652,22 +650,18 @@ for i = 1:length(DEPT)-1
 end
 plot(Vsh, DEPT, 'Color', [0.4 0.3 0.1], 'LineWidth', 1.5); 
 xlim([0 1]); xticks([0 0.25 0.5 0.75 1]); set(ax_pet(1), 'Layer', 'top');
-
 % Track Porosity
 axes(ax_pet(2)); plot(phi_eff, DEPT, 'c', 'LineWidth', 1.5); xlim([0 1]); xticks([0 0.25 0.5 0.75 1]); set(gca, 'XDir', 'normal');
-
 % Track Sw
 axes(ax_pet(3)); plot(Sw, DEPT, 'y', 'LineWidth', 1.5); xlim([0 1]); xticks([0 0.25 0.5 0.75 1]);
-
 linkaxes(ax_pet,'y'); set(ax_pet(1), 'YLim', [Top_Formasi Base_Formasi]);
 exportgraphics(fig_petro, '3_Distribusi_Petrofisika_Mentah_600DPI.png', 'Resolution', 600);
 
-%% ========================================================================
-%   7. PLOT FINAL (DENGAN FLAG WARNA), PAY SUMMARY & EXPORT EXCEL
-% =========================================================================
+%% 7. Plot Final Distribusi Petrofisika (Net Pay & Net Reservoir) 
 fig_final = figure('Name','Final Petrophysical Distribution','Color','w','Position',[50 50 1000 850], 'NumberTitle','off');
-total_width_fin = 1.0 - margin_left - margin_right; w_fin = (total_width_fin - (2 * gap)) / 3; % Kembali ke 3 track
-lbl_fin = {{'VSHALE', '(%)', '0', '1'}, {'EFFECTIVE POROSITY', '(%)', '0', '1'}, {'WATER SATURATION', '(%)', '0', '1'}};
+total_width_fin = 1.0 - margin_left - margin_right; w_fin = (total_width_fin - (2 * gap)) / 3; 
+
+lbl_fin = {{'Volume Shale', '(v/v)', '0', '1'}, {'Effective Porosity', '(v/v)', '0', '1'}, {'Water Saturation', '(v/v)', '0', '1'}};
 
 ax_fin = gobjects(1, 3); curr_x = margin_left;
 for i = 1:3
@@ -681,45 +675,91 @@ for i = 1:3
     if i == 1, ylabel(ax_fin(i), 'Depth (ft)', 'FontWeight', 'bold', 'FontSize', 11); else, set(ax_fin(i), 'YTickLabel', []); end
     hold(ax_fin(i), 'on'); curr_x = curr_x + w_fin + gap;
 end
-
-% Lebar pita flag di sisi track (0.05 = 5% dari lebar track)
-flag_w = 0.05; 
-
+flag_w = 0.10; 
 % Track 1: Vshale
 axes(ax_fin(1)); 
-func_draw_patches_fast(ax_fin(1), DEPT, netResFlag, [0, flag_w], [0 0.8 0], 0.65);         % PITA HIJAU (Kiri)
-func_draw_patches_fast(ax_fin(1), DEPT, netPayFlag, [1-flag_w, 1.0], [1 0 0], 0.75);       % PITA MERAH (Kanan)
+func_draw_patches_fast(ax_fin(1), DEPT, netResFlag, [0, flag_w], [0 0.8 0], 0.65);         % HIJAU
+func_draw_patches_fast(ax_fin(1), DEPT, netPayFlag, [1-flag_w, 1.0], [1 0 0], 0.75);       % MERAH
 for i = 1:length(DEPT)-1
     if isnan(Vsh(i)) || isnan(Vsh(i+1)); continue; end
     patch([Vsh(i) 1 1 Vsh(i)], [DEPT(i) DEPT(i) DEPT(i+1) DEPT(i+1)], [0.85 0.85 0.85], 'FaceAlpha', 1.0, 'EdgeColor', 'none'); 
 end
 plot(Vsh, DEPT, 'Color', [0.4 0.3 0.1], 'LineWidth', 1.5); 
 xlim([0 1]); xticks([0 0.25 0.5 0.75 1]); set(ax_fin(1), 'Layer', 'top');
-
 % Track 2: Porosity
 axes(ax_fin(2)); 
-func_draw_patches_fast(ax_fin(2), DEPT, netResFlag, [0, flag_w], [0 0.8 0], 0.65);         % PITA HIJAU (Kiri)
-func_draw_patches_fast(ax_fin(2), DEPT, netPayFlag, [1-flag_w, 1.0], [1 0 0], 0.75);       % PITA MERAH (Kanan)
+func_draw_patches_fast(ax_fin(2), DEPT, netResFlag, [0, flag_w], [0 0.8 0], 0.65);         % HIJAU
+func_draw_patches_fast(ax_fin(2), DEPT, netPayFlag, [1-flag_w, 1.0], [1 0 0], 0.75);       % MERAH 
 plot(phi_eff, DEPT, 'c', 'LineWidth', 1.5); 
 xlim([0 1]); xticks([0 0.25 0.5 0.75 1]); set(ax_fin(2), 'Layer', 'top');
-
 % Track 3: Sw
 axes(ax_fin(3)); 
-func_draw_patches_fast(ax_fin(3), DEPT, netResFlag, [0, flag_w], [0 0.8 0], 0.65);         % PITA HIJAU (Kiri)
-func_draw_patches_fast(ax_fin(3), DEPT, netPayFlag, [1-flag_w, 1.0], [1 0 0], 0.75);       % PITA MERAH (Kanan)
+func_draw_patches_fast(ax_fin(3), DEPT, netResFlag, [0, flag_w], [0 0.8 0], 0.65);         % HIJAU 
+func_draw_patches_fast(ax_fin(3), DEPT, netPayFlag, [1-flag_w, 1.0], [1 0 0], 0.75);       % MERAH 
 plot(Sw, DEPT, 'y', 'LineWidth', 1.5); 
 xlim([0 1]); xticks([0 0.25 0.5 0.75 1]); set(ax_fin(3), 'Layer', 'top');
-
 linkaxes(ax_fin,'y'); set(ax_fin(1), 'YLim', [Top_Formasi Base_Formasi]);
 exportgraphics(fig_final, '4_Distribusi_Petrofisika_Final_Flag_600DPI.png', 'Resolution', 600);
 
-% --- EXPORT EXCEL & SUMMARY ---
+%% 7. Plot Final Distribusi Petrofisika (Net Pay & Net Reservoir) 
+fig_final = figure('Name','Final Petrophysical Distribution','Color','w','Position',[50 50 1000 850], 'NumberTitle','off');
+total_width_fin = 1.0 - margin_left - margin_right; w_fin = (total_width_fin - (2 * gap)) / 3; 
+
+lbl_fin = {{'Volume Shale', '(v/v)', '0', '1'}, {'Effective Porosity', '(v/v)', '0', '1'}, {'Water Saturation', '(v/v)', '0', '1'}};
+
+ax_fin = gobjects(1, 3); curr_x = margin_left;
+for i = 1:3
+    axes('Position',[curr_x, y_header, w_fin, h_header]); axis off; rectangle('Position',[0 0 1 1],'LineWidth',1); 
+    text(0.5, 0.70, lbl_fin{i}{1}, 'Horiz','center','FontWeight','bold','FontSize',14);
+    text(0.5, 0.30, lbl_fin{i}{2}, 'Horiz','center','FontSize',14,'FontWeight','bold');
+    text(0.02, 0.1, lbl_fin{i}{3}, 'Horiz','left','FontSize',12,'FontWeight','bold'); text(0.98, 0.1, lbl_fin{i}{4}, 'Horiz','right','FontSize',12,'FontWeight','bold');
+    
+    ax_fin(i) = axes('Position', [curr_x, y_track, w_fin, h_track]);
+    set(ax_fin(i), 'FontName', font_name, 'FontSize', axis_size, 'Box', 'on', 'LineWidth', 1.0, 'TickDir', 'out', 'XColor', 'k', 'YColor', 'k', 'YDir', 'reverse', 'XAxisLocation', 'bottom', 'XTickLabel', [], 'XGrid', 'on', 'YGrid', 'on', 'GridColor', grid_color, 'GridAlpha', 0.8, 'XMinorGrid', 'on', 'YMinorGrid', 'on', 'MinorGridColor', grid_color, 'MinorGridAlpha', 0.4);
+    if i == 1, ylabel(ax_fin(i), 'Depth (ft)', 'FontWeight', 'bold', 'FontSize', 11); else, set(ax_fin(i), 'YTickLabel', []); end
+    hold(ax_fin(i), 'on'); curr_x = curr_x + w_fin + gap;
+end
+flag_w = 0.10; 
+% Track 1: Vshale
+axes(ax_fin(1)); 
+func_draw_patches_fast(ax_fin(1), DEPT, netResFlag, [0, flag_w], [0 0.8 0], 0.65);         % HIJAU
+func_draw_patches_fast(ax_fin(1), DEPT, netPayFlag, [1-flag_w, 1.0], [1 0 0], 0.75);       % MERAH
+for i = 1:length(DEPT)-1
+    if isnan(Vsh(i)) || isnan(Vsh(i+1)); continue; end
+    patch([Vsh(i) 1 1 Vsh(i)], [DEPT(i) DEPT(i) DEPT(i+1) DEPT(i+1)], [0.85 0.85 0.85], 'FaceAlpha', 1.0, 'EdgeColor', 'none'); 
+end
+plot(Vsh, DEPT, 'Color', [0.4 0.3 0.1], 'LineWidth', 1.5); 
+xlim([0 1]); xticks([0 0.25 0.5 0.75 1]); set(ax_fin(1), 'Layer', 'top');
+% Track 2: Porosity
+axes(ax_fin(2)); 
+func_draw_patches_fast(ax_fin(2), DEPT, netResFlag, [0, flag_w], [0 0.8 0], 0.65);         % HIJAU
+func_draw_patches_fast(ax_fin(2), DEPT, netPayFlag, [1-flag_w, 1.0], [1 0 0], 0.75);       % MERAH 
+plot(phi_eff, DEPT, 'c', 'LineWidth', 1.5); 
+xlim([0 1]); xticks([0 0.25 0.5 0.75 1]); set(ax_fin(2), 'Layer', 'top');
+% Track 3: Sw
+axes(ax_fin(3)); 
+func_draw_patches_fast(ax_fin(3), DEPT, netResFlag, [0, flag_w], [0 0.8 0], 0.65);         % HIJAU 
+func_draw_patches_fast(ax_fin(3), DEPT, netPayFlag, [1-flag_w, 1.0], [1 0 0], 0.75);       % MERAH 
+plot(Sw, DEPT, 'y', 'LineWidth', 1.5); 
+xlim([0 1]); xticks([0 0.25 0.5 0.75 1]); set(ax_fin(3), 'Layer', 'top');
+linkaxes(ax_fin,'y'); set(ax_fin(1), 'YLim', [Top_Formasi Base_Formasi]);
+exportgraphics(fig_final, '4_Distribusi_Petrofisika_Final_Flag_600DPI.png', 'Resolution', 600);
+
+% EXPORT EXCEL & SUMMARY
 idx_form = find(DEPT >= Top_Formasi & DEPT <= Base_Formasi & valid_log); 
 gross_thick = length(idx_form) * dz;
 idx_net_res = find(DEPT >= Top_Formasi & DEPT <= Base_Formasi & Vsh <= CO_Vsh & phi_eff >= CO_Phi & valid_log); 
 net_res_thick = length(idx_net_res) * dz;
 idx_net_pay = find(DEPT >= Top_Formasi & DEPT <= Base_Formasi & Vsh <= CO_Vsh & phi_eff >= CO_Phi & Sw <= CO_Sw & valid_log); 
 net_pay_thick = length(idx_net_pay) * dz;
+
+if gross_thick > 0
+    avg_vsh_gross = mean(Vsh(idx_form), 'omitnan'); 
+    avg_phi_gross = mean(phi_eff(idx_form), 'omitnan'); 
+    avg_sw_gross  = mean(Sw(idx_form), 'omitnan');
+else
+    avg_vsh_gross = 0; avg_phi_gross = 0; avg_sw_gross = 0;
+end
 
 if net_pay_thick > 0
     avg_vsh_pay = mean(Vsh(idx_net_pay), 'omitnan'); 
@@ -729,19 +769,28 @@ else
     avg_vsh_pay = 0; avg_phi_pay = 0; avg_sw_pay = 0;
 end
 
+% Print ke Command Window
 fprintf('\n=========================================================================\n');
-fprintf('                 RESERVOIR PAY SUMMARY \n');
+fprintf('                         RESERVOIR SUMMARY \n');
 fprintf('=========================================================================\n');
 fprintf(' Interval Kedalaman : %g ft - %g ft\n', Top_Formasi, Base_Formasi);
 fprintf(' *Catatan: Interval Washout/Failure dieksklusi (Data Tidak Valid)\n');
 fprintf('-------------------------------------------------------------------------\n');
+fprintf(' [THICKNESS]\n');
 fprintf(' 1. Gross Rock Thickness    : %7.1f ft (Valid)\n', gross_thick);
 fprintf(' 2. Net Reservoir Thickness : %7.1f ft\n', net_res_thick);
 fprintf(' 3. Net Pay Thickness       : %7.1f ft\n', net_pay_thick);
 fprintf(' 4. Net-to-Gross (N/G) Ratio: %7.3f\n', net_pay_thick / max(gross_thick, 0.001));
-fprintf(' 5. Average Vshale (Pay)    : %7.5f (%.2f %%)\n', avg_vsh_pay, avg_vsh_pay*100);
-fprintf(' 6. Average Porosity (Pay)  : %7.5f (%.2f %%)\n', avg_phi_pay, avg_phi_pay*100);
-fprintf(' 7. Average Sw (Pay)        : %7.5f (%.2f %%)\n', avg_sw_pay, avg_sw_pay*100);
+fprintf('-------------------------------------------------------------------------\n');
+fprintf(' [AVERAGE PROPERTIES - GROSS INTERVAL]\n');
+fprintf(' 5. Average Vshale (Gross)  : %7.5f (%.2f %%)\n', avg_vsh_gross, avg_vsh_gross*100);
+fprintf(' 6. Average Porosity(Gross) : %7.5f (%.2f %%)\n', avg_phi_gross, avg_phi_gross*100);
+fprintf(' 7. Average Sw (Gross)      : %7.5f (%.2f %%)\n', avg_sw_gross, avg_sw_gross*100);
+fprintf('-------------------------------------------------------------------------\n');
+fprintf(' [AVERAGE PROPERTIES - NET PAY ZONE]\n');
+fprintf(' 8. Average Vshale (Pay)    : %7.5f (%.2f %%)\n', avg_vsh_pay, avg_vsh_pay*100);
+fprintf(' 9. Average Porosity (Pay)  : %7.5f (%.2f %%)\n', avg_phi_pay, avg_phi_pay*100);
+fprintf(' 10. Average Sw (Pay)       : %7.5f (%.2f %%)\n', avg_sw_pay, avg_sw_pay*100);
 fprintf('=========================================================================\n\n');
 
 ResStatus_Code = NaN(size(DEPT));
@@ -777,15 +826,13 @@ nama_file_excel = 'Hasil_Petrofisika_Dinamis.xlsx';
 writetable(Tabel_Petrofisika, nama_file_excel, 'Sheet', 'Data_Petrofisika_Target');
 writetable(Tabel_Raw_LAS, nama_file_excel, 'Sheet', 'Raw_Data_LAS_Full');
 
-fprintf('=> SUKSES! File Excel telah dibuat: %s\n', nama_file_excel);
+fprintf('=> File Excel telah dibuat: %s\n', nama_file_excel);
 fprintf('   - Sheet 1: Data Petrofisika Target (%g ft - %g ft)\n', Top_Formasi, Base_Formasi);
 fprintf('   - Sheet 2: Data Konversi Raw LAS (Full Depth)\n');
 fprintf('=> ANALISIS SELESAI. SILAKAN CEK FOLDER MATLAB ANDA!\n');
 fprintf('==========================================================================================================================\n\n');
 
-%% ========================================================================
-%                     FUNCTION BLOCKS 
-% =========================================================================
+%% Fungsi Bantuan
 function func_draw_patches_fast(ax, depth, flag, x_bounds, color, alpha)
     dFlag = diff([0; flag(:); 0]);
     start_indices = find(dFlag == 1);
@@ -809,3 +856,4 @@ function func_draw_patches_fast(ax, depth, flag, x_bounds, color, alpha)
         uistack(p, 'bottom');
     end
 end
+
